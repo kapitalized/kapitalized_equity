@@ -1,3 +1,10 @@
+// Add this at the top of your App.js file
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+// You can then use these to initialize Supabase client
+console.log('Supabase URL:', supabaseUrl); // For testing
+
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, Eye, EyeOff } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
