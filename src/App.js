@@ -9,7 +9,8 @@ import _ from 'lodash';
 // For Vercel deployment, ensure your REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY
 // environment variables are correctly set in Vercel.
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Your Supabase Anon Key
+// IMPORTANT: Replaced with your CURRENT Supabase Anon Key
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
 
 let supabase = null;
 // Check if window.supabase exists (meaning the CDN script has loaded)
@@ -32,6 +33,7 @@ const EquityManagementApp = () => {
   const [shareIssuances, setShareIssuances] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [errorMessage, setErrorMessage] = useState(''); // State for displaying error messages
+  const [signUpSuccessMessage, setSignUpSuccessMessage] = useState(''); // New state for sign-up success message
 
   // Form/Modal states
   const [showLogin, setShowLogin] = useState(true);
@@ -99,6 +101,7 @@ const EquityManagementApp = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+    setSignUpSuccessMessage(''); // Clear sign up success message on login attempt
     setLoading(true);
     if (!supabase) {
       setErrorMessage("Supabase client not initialized.");
@@ -120,6 +123,7 @@ const EquityManagementApp = () => {
   const handleSignUp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+    setSignUpSuccessMessage(''); // Clear previous messages
     setLoading(true);
     if (!supabase) {
       setErrorMessage("Supabase client not initialized.");
@@ -144,10 +148,14 @@ const EquityManagementApp = () => {
       } else if (data.user) {
         // Removed client-side insert for user_profiles.
         // The database trigger `on_auth_user_created` will handle this automatically.
-        alert('Sign up successful! Please check your email to confirm your account.');
+        setSignUpSuccessMessage('Sign up successful! Please check your email to confirm your account. You can now log in.');
+        
+        // --- Create dummy data for the new user ---
+        await createSampleDataForNewUser(data.user.id);
+
         setShowSignUp(false);
         setShowLogin(true);
-        setLoginData({ email: signUpData.email, password: signUpData.password });
+        setLoginData({ email: signUpData.email, password: '' }); // Clear password for security
       }
     } catch (error) {
       setErrorMessage('Sign up failed: ' + error.message);
@@ -326,6 +334,114 @@ const EquityManagementApp = () => {
       setErrorMessage('Error updating password: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --- Dummy Data Creation for New Users ---
+  const createSampleDataForNewUser = async (userId) => {
+    if (!supabase) {
+      console.error("Supabase client not initialized for sample data creation.");
+      return;
+    }
+    try {
+      // 1. Create Sample Company
+      const { data: sampleCompany, error: companyError } = await supabase
+        .from('companies')
+        .insert({
+          name: 'Umbrella Corp Ltd [Sample]',
+          description: 'Sample company for demonstration purposes',
+          user_id: userId,
+        })
+        .select()
+        .single();
+
+      if (companyError) throw companyError;
+      console.log('Sample company created:', sampleCompany.name);
+
+      // 2. Add Default Share Classes (already handled in createCompany, but ensuring here if needed elsewhere)
+      // For a new user, this will be handled when their first company is created.
+      // If this function is called independently, we might need to re-evaluate.
+      // For now, assuming createCompany handles initial share classes.
+
+      // 3. Create Sample Shareholders
+      const sampleShareholdersData = [
+        { name: 'Alice Smith [Sample]', email: 'alice.sample@example.com', type: 'Founder' },
+        { name: 'Bob Johnson [Sample]', email: 'bob.sample@example.com', type: 'Investor' },
+        { name: 'Charlie Brown [Sample]', email: 'charlie.sample@example.com', type: 'Employee' },
+      ];
+
+      const shareholdersToInsert = sampleShareholdersData.map(sh => ({
+        ...sh,
+        company_id: sampleCompany.id,
+      }));
+
+      const { data: createdShareholders, error: shareholdersError } = await supabase
+        .from('shareholders')
+        .insert(shareholdersToInsert)
+        .select();
+
+      if (shareholdersError) throw shareholdersError;
+      console.log('Sample shareholders created:', createdShareholders.map(s => s.name));
+
+      // 4. Create Sample Share Issuances
+      // Fetch default share classes for the new company to link issuances
+      const { data: defaultShareClasses, error: fetchClassesError } = await supabase
+        .from('share_classes')
+        .select('*')
+        .eq('company_id', sampleCompany.id);
+
+      if (fetchClassesError) throw fetchClassesError;
+
+      const commonClass = defaultShareClasses.find(sc => sc.name === 'Common');
+      const prefPartClass = defaultShareClasses.find(sc => sc.name === 'Preference Participating');
+
+      if (!commonClass || !prefPartClass) {
+        console.warn('Could not find default share classes for sample issuances.');
+        return;
+      }
+
+      const sampleIssuancesData = [
+        {
+          shareholder_id: createdShareholders[0].id, // Alice
+          share_class_id: commonClass.id,
+          shares: 1000000,
+          price_per_share: 0.01,
+          issue_date: '2023-01-01',
+          round: 'Seed Round',
+        },
+        {
+          shareholder_id: createdShareholders[1].id, // Bob
+          share_class_id: prefPartClass.id,
+          shares: 500000,
+          price_per_share: 1.50,
+          issue_date: '2023-06-15',
+          round: 'Series A',
+        },
+        {
+          shareholder_id: createdShareholders[2].id, // Charlie
+          share_class_id: commonClass.id,
+          shares: 50000,
+          price_per_share: 0.01,
+          issue_date: '2023-02-01',
+          round: 'Seed Round',
+        },
+      ];
+
+      const issuancesToInsert = sampleIssuancesData.map(issuance => ({
+        ...issuance,
+        company_id: sampleCompany.id,
+      }));
+
+      const { error: issuancesError } = await supabase
+        .from('share_issuances')
+        .insert(issuancesToInsert);
+
+      if (issuancesError) throw issuancesError;
+      console.log('Sample issuances created.');
+
+    } catch (error) {
+      console.error('Error creating sample data for new user:', error.message);
+      setErrorMessage('Failed to create sample data: ' + error.message);
     }
   };
 
@@ -611,7 +727,7 @@ const EquityManagementApp = () => {
               // Optionally create share class if not found, or log error
               console.warn(`Share class "${shareClassName}" not found. Skipping issuance.`);
               continue;
-            }
+              }
 
             const issuance = {
               shareholderId: shareholder.id,
@@ -654,6 +770,14 @@ const EquityManagementApp = () => {
           {errorMessage && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
               <span className="block sm:inline">{errorMessage}</span>
+            </div>
+          )}
+          {signUpSuccessMessage && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <span className="block sm:inline">{signUpSuccessMessage}</span>
+              <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setSignUpSuccessMessage('')}>
+                <svg className="fill-current h-6 w-6 text-green-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+              </span>
             </div>
           )}
           {showLogin && (
@@ -731,9 +855,9 @@ const EquityManagementApp = () => {
           )}
           <p className="mt-4 text-sm text-gray-600 text-center">
             {showLogin ? (
-              <>Don't have an account? <button onClick={() => { setShowLogin(false); setShowSignUp(true); setErrorMessage(''); }} className="text-blue-600 hover:underline">Sign Up</button></>
+              <>Don't have an account? <button onClick={() => { setShowLogin(false); setShowSignUp(true); setErrorMessage(''); setSignUpSuccessMessage(''); }} className="text-blue-600 hover:underline">Sign Up</button></>
             ) : (
-              <>Already have an account? <button onClick={() => { setShowSignUp(false); setShowLogin(true); setErrorMessage(''); }} className="text-blue-600 hover:underline">Sign In</button></>
+              <>Already have an account? <button onClick={() => { setShowSignUp(false); setShowLogin(true); setErrorMessage(''); setSignUpSuccessMessage(''); }} className="text-blue-600 hover:underline">Sign In</button></>
             )}
           </p>
         </div>
@@ -1799,4 +1923,5 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
     </div>
   );
 };
+
 export default EquityManagementApp;
