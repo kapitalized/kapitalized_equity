@@ -128,24 +128,24 @@ const EquityManagementApp = () => {
     const { data, error } = await supabase.auth.signUp({
       email: signUpData.email,
       password: signUpData.password,
+      // Pass full_name in raw_user_meta_data for the trigger to pick up
+      options: {
+        data: {
+          full_name: signUpData.fullName
+        }
+      }
     });
     setLoading(false);
 
     if (error) {
       setErrorMessage(error.message);
     } else if (data.user) {
-      // If user is created, immediately create a profile entry for them
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({ id: data.user.id, full_name: signUpData.fullName });
-      if (profileError) {
-        setErrorMessage('User registered, but profile creation failed: ' + profileError.message);
-      } else {
-        alert('Sign up successful! Please check your email to confirm your account.');
-        setShowSignUp(false);
-        setShowLogin(true);
-        setLoginData({ email: signUpData.email, password: signUpData.password });
-      }
+      // Removed client-side insert for user_profiles.
+      // The database trigger `on_auth_user_created` will handle this automatically.
+      alert('Sign up successful! Please check your email to confirm your account.');
+      setShowSignUp(false);
+      setShowLogin(true);
+      setLoginData({ email: signUpData.email, password: signUpData.password });
     }
   };
 
