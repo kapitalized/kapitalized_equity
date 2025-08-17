@@ -9,7 +9,7 @@ import _ from 'lodash';
 // For Vercel deployment, ensure your REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY
 // environment variables are correctly set in Vercel.
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Your Supabase Anon Key
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImexY3AiOjIwNzAwNzMzODZ9.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Your Supabase Anon Key
 
 let supabase = null;
 // Check if window.supabase exists (meaning the CDN script has loaded)
@@ -45,6 +45,7 @@ const EquityManagementApp = () => {
   const [showCreateShareClass, setShowCreateShareClass] = useState(false);
   const [showCreateIssuance, setShowCreateIssuance] = useState(false);
   const [showBulkAddIssuance, setShowBulkAddIssuance] = useState(false); // New bulk add modal
+  const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false); // New bulk add shareholder modal
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
@@ -125,27 +126,32 @@ const EquityManagementApp = () => {
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase.auth.signUp({
-      email: signUpData.email,
-      password: signUpData.password,
-      // Pass full_name in raw_user_meta_data for the trigger to pick up
-      options: {
-        data: {
-          full_name: signUpData.fullName
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: signUpData.email,
+        password: signUpData.password,
+        // Pass full_name in raw_user_meta_data for the trigger to pick up
+        options: {
+          data: {
+            full_name: signUpData.fullName // Ensure this matches the DB column name for the trigger
+          }
         }
-      }
-    });
-    setLoading(false);
+      });
+      setLoading(false);
 
-    if (error) {
-      setErrorMessage(error.message);
-    } else if (data.user) {
-      // Removed client-side insert for user_profiles.
-      // The database trigger `on_auth_user_created` will handle this automatically.
-      alert('Sign up successful! Please check your email to confirm your account.');
-      setShowSignUp(false);
-      setShowLogin(true);
-      setLoginData({ email: signUpData.email, password: signUpData.password });
+      if (error) {
+        setErrorMessage(error.message);
+      } else if (data.user) {
+        // Removed client-side insert for user_profiles.
+        // The database trigger `on_auth_user_created` will handle this automatically.
+        alert('Sign up successful! Please check your email to confirm your account.');
+        setShowSignUp(false);
+        setShowLogin(true);
+        setLoginData({ email: signUpData.email, password: signUpData.password });
+      }
+    } catch (error) {
+      setErrorMessage('Sign up failed: ' + error.message);
+      setLoading(false);
     }
   };
 
@@ -281,12 +287,19 @@ const EquityManagementApp = () => {
       return;
     }
     try {
+      // Ensure data sent matches database column names (snake_case)
+      const dataToUpdate = {
+        full_name: profileData.fullName, // Convert from camelCase to snake_case
+        dob: profileData.dob,
+        address: profileData.address,
+      };
       const { data, error } = await supabase
         .from('user_profiles')
-        .upsert({ id: user.id, ...profileData }, { onConflict: 'id' }); // Use upsert to insert or update
+        .upsert({ id: user.id, ...dataToUpdate }, { onConflict: 'id' }); // Use upsert to insert or update
 
       if (error) throw error;
-      setUserProfile(profileData); // Update local state
+      // Update local state with the data that was actually sent (snake_case for internal consistency)
+      setUserProfile({ ...userProfile, ...dataToUpdate });
       alert('Profile updated successfully!');
     } catch (error) {
       setErrorMessage('Error updating profile: ' + error.message);
@@ -328,7 +341,7 @@ const EquityManagementApp = () => {
       return;
     }
     try {
-      const { data: newCompany, error } = await supabase
+      const { data: newCompany, error: companyError } = await supabase
         .from('companies')
         .insert({
           name: data.name,
@@ -338,10 +351,36 @@ const EquityManagementApp = () => {
         .select() // Select the newly inserted row to get its ID and other fields
         .single();
 
-      if (error) throw error;
+      if (companyError) throw companyError;
       setCompanies([...companies, newCompany]);
       setSelectedCompany(newCompany); // Select the new company
       setShowCreateCompany(false);
+
+      // --- Add default share classes for the new company ---
+      const defaultShareClasses = [
+        { name: 'Common', priority: 10, description: 'Standard common shares' },
+        { name: 'Preference Participating', priority: 1, description: 'Preferred shares with participation rights' },
+        { name: 'Preference Non-Participating', priority: 2, description: 'Preferred shares without participation rights' },
+        { name: 'Convertible', priority: 5, description: 'Shares convertible into common shares' },
+      ];
+
+      const shareClassesToInsert = defaultShareClasses.map(sc => ({
+        ...sc,
+        company_id: newCompany.id // Associate with the newly created company
+      }));
+
+      const { error: shareClassError } = await supabase
+        .from('share_classes')
+        .insert(shareClassesToInsert);
+
+      if (shareClassError) {
+        console.error("Error inserting default share classes:", shareClassError.message);
+        setErrorMessage('Company created, but failed to add default share classes: ' + shareClassError.message);
+      } else {
+        // Re-fetch all share classes for the selected company to update state
+        fetchCompanyRelatedData(newCompany.id);
+      }
+
     } catch (error) {
       setErrorMessage('Error creating company: ' + error.message);
     } finally {
@@ -373,6 +412,7 @@ const EquityManagementApp = () => {
       if (error) throw error;
       setShareholders([...shareholders, newShareholder]);
       setShowCreateShareholder(false);
+      setShowBulkAddShareholder(false); // Close bulk add if opened from there
     } catch (error) {
       setErrorMessage('Error creating shareholder: ' + error.message);
     } finally {
@@ -773,6 +813,7 @@ const EquityManagementApp = () => {
                   { id: 'shareholders', name: 'Shareholders', icon: Users },
                   { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
                   { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload }, // New Tab
+                  { id: 'bulk-add-shareholder', name: 'Bulk Add Shareholders', icon: Users }, // New Tab
                   { id: 'account', name: 'My Account', icon: User } // New Tab
                 ].map(tab => (
                   <button
@@ -1020,6 +1061,21 @@ const EquityManagementApp = () => {
                     accept=".csv"
                     onChange={handleCsvUpload}
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Bulk Add Shareholders Tab */}
+            {activeTab === 'bulk-add-shareholder' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Bulk Add Shareholders</h2>
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Add up to 5 new shareholders at a time</h3>
+                  <BulkShareholderForm
+                    onSubmit={createShareholder}
+                    errorMessage={errorMessage}
+                    setErrorMessage={setErrorMessage}
                   />
                 </div>
               </div>
@@ -1529,10 +1585,100 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
   );
 };
 
+// New Component: BulkShareholderForm
+const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
+  const [shareholders, setShareholders] = useState(
+    Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' }))
+  );
+
+  const handleChange = (index, field, value) => {
+    const newShareholders = [...shareholders];
+    newShareholders[index][field] = value;
+    setShareholders(newShareholders);
+  };
+
+  const handleSubmitAll = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    let allSuccessful = true;
+    for (const shareholder of shareholders) {
+      // Only attempt to submit if name is provided (basic validation for a row)
+      if (shareholder.name.trim() !== '') {
+        try {
+          await onSubmit(shareholder); // Call the parent's createShareholder
+        } catch (error) {
+          setErrorMessage(`Error adding shareholder ${shareholder.name}: ${error.message}`);
+          allSuccessful = false;
+          break;
+        }
+      }
+    }
+    if (allSuccessful) {
+      alert('All valid shareholders added successfully!');
+      setShareholders(Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' }))); // Reset form
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmitAll}>
+      {shareholders.map((shareholder, index) => (
+        <div key={index} className="mb-4 p-4 border border-gray-200 rounded-md">
+          <h4 className="text-md font-medium text-gray-800 mb-3">Shareholder #{index + 1}</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                value={shareholder.name}
+                onChange={(e) => handleChange(index, 'name', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required={index === 0} // Make first row's name required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={shareholder.email}
+                onChange={(e) => handleChange(index, 'email', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <select
+                value={shareholder.type}
+                onChange={(e) => handleChange(index, 'type', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Founder">Founder</option>
+                <option value="Employee">Employee</option>
+                <option value="Investor">Investor</option>
+                <option value="Advisor">Advisor</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="flex justify-end mt-6">
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          Add All Shareholders
+        </button>
+      </div>
+    </form>
+  );
+};
+
+
 // New Component: UserProfileForm
 const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage, setErrorMessage }) => {
+  // Initialize state using snake_case to match DB and then convert to camelCase for display if needed
   const [profileData, setProfileData] = useState({
-    fullName: userProfile?.full_name || '',
+    fullName: userProfile?.full_name || '', // Display as fullName
     dob: userProfile?.dob || '',
     address: userProfile?.address || '',
   });
@@ -1550,7 +1696,12 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
 
   const handleProfileSubmit = (e) => {
     e.preventDefault();
-    onSubmit(profileData);
+    // Pass data to parent in a format that matches DB columns (snake_case for full_name)
+    onSubmit({
+      full_name: profileData.fullName, // Convert fullName back to full_name for submission
+      dob: profileData.dob,
+      address: profileData.address,
+    });
   };
 
   const handlePasswordSubmit = (e) => {
@@ -1578,7 +1729,7 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
             <input
               type="text"
-              value={profileData.fullName}
+              value={profileData.fullName} // Display using camelCase
               onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
