@@ -2,22 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
-// Removed: import { createClient } from '@supabase/supabase-js';
+// REMOVED: import { createClient } from '@supabase/supabase-js'; // This import caused resolution issues
 
-// Initialize Supabase Client
-// DIRECTLY USE THE SUPABASE KEYS AS process.env IS NOT AVAILABLE IN THIS ENVIRONMENT
-const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
+// Initialize Supabase Client directly from the global window object.
+// This requires the Supabase CDN script to be loaded in public/index.html.
+// For Vercel deployment, ensure your REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY
+// environment variables are correctly set in Vercel.
+const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Your Supabase Anon Key
 
-// Initialize Supabase using the globally available 'supabase' object from CDN
-// This change addresses the compilation error in the Canvas environment.
-// For your actual Vercel deployment, ensure '@supabase/supabase-js' is listed in your package.json dependencies.
 let supabase = null;
+// Check if window.supabase exists (meaning the CDN script has loaded)
 if (typeof window !== 'undefined' && window.supabase) {
   supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 } else {
-  console.error("Supabase client not available. Ensure Supabase CDN script is loaded or package is installed.");
-  // Fallback or error handling for environments where Supabase is not globally available
+  // This might happen if the CDN script hasn't loaded yet, or in a server-side rendering context
+  console.error("Supabase client not found on window. Ensure CDN script is loaded.");
 }
 
 
@@ -53,7 +53,7 @@ const EquityManagementApp = () => {
     // Ensure supabase client is initialized before proceeding
     if (!supabase) {
       setLoading(false);
-      setErrorMessage("Supabase client not initialized. Cannot proceed with authentication.");
+      setErrorMessage("Supabase client not initialized. Cannot proceed with authentication. Please check browser console for details.");
       return;
     }
 
@@ -1054,7 +1054,7 @@ const EquityManagementApp = () => {
         </Modal>
       )}
       {showCreateShareClass && (
-        <Modal onClose={() => setShowShareClass(false)}>
+        <Modal onClose={() => setShowCreateShareClass(false)}>
           <ShareClassForm onSubmit={createShareClass} onCancel={() => setShowCreateShareClass(false)} />
         </Modal>
       )}
@@ -1648,5 +1648,4 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
     </div>
   );
 };
-
 export default EquityManagementApp;
