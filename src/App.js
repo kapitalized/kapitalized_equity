@@ -23,8 +23,9 @@ if (typeof window !== 'undefined' && window.supabase) {
 
 
 const EquityManagementApp = () => {
-  // Ref for PDF capture
-  const componentRef = useRef();
+  // Refs for PDF capture
+  const dashboardRef = useRef(); // Ref for the entire dashboard content (for general layout)
+  const pieChartRef = useRef(); // Specific ref for the PieChart component
 
   // State management
   const [user, setUser] = useState(null);
@@ -812,8 +813,8 @@ const EquityManagementApp = () => {
 
   // --- PDF Download Function ---
   const handleDownloadPdf = async () => {
-    if (!selectedCompany || !componentRef.current || !window.html2canvas || !window.jspdf) {
-      setErrorMessage("Cannot generate PDF. Ensure a company is selected and PDF libraries are loaded.");
+    if (!selectedCompany || !window.jspdf) {
+      setErrorMessage("Cannot generate PDF. Ensure a company is selected and jsPDF library is loaded.");
       return;
     }
 
@@ -821,30 +822,134 @@ const EquityManagementApp = () => {
     setErrorMessage('');
 
     try {
-      const input = componentRef.current;
-      const canvas = await window.html2canvas(input, {
-        scale: 2, // Increase scale for better resolution
-        useCORS: true, // Needed if images/fonts are from different origins
-        logging: true,
-      });
+      const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+      let y = 10; // Initial Y position
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4'); // 'p' for portrait, 'mm' for millimeters, 'a4' size
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 297; // A4 height in mm
-      const imgHeight = canvas.height * imgWidth / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      // Company Details
+      pdf.setFontSize(18);
+      pdf.text(`${selectedCompany.name} - Company Equity Profile`, 10, y);
+      y += 10;
+      pdf.setFontSize(12);
+      pdf.text(`Description: ${selectedCompany.description || 'N/A'}`, 10, y);
+      y += 10;
+      pdf.text(`Generated On: ${new Date().toLocaleDateString()}`, 10, y);
+      y += 15;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      // Summary Cards Data
+      pdf.setFontSize(14);
+      pdf.text('Company Overview', 10, y);
+      y += 7;
+      pdf.setFontSize(12);
+      pdf.text(`Total Shares Outstanding: ${companyData.totalShares.toLocaleString()}`, 10, y);
+      y += 7;
+      pdf.text(`Total Equity Value (Sum of issuances): $${companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 10, y);
+      y += 7;
+      pdf.text(`Latest Valuation per Share: $${companyData.latestValuationPerShare.toFixed(2)}`, 10, y);
+      y += 7;
+      pdf.text(`Company Valuation (Total Shares x Latest Price): $${companyData.companyValuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 10, y);
+      y += 15;
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      // Pie Chart (captured as image)
+      if (pieChartRef.current && window.html2canvas) {
+        pdf.setFontSize(14);
+        pdf.text('Share Distribution by Class', 10, y);
+        y += 5;
+        const pieCanvas = await window.html2canvas(pieChartRef.current, { scale: 2, useCORS: true });
+        const pieImgData = pieCanvas.toDataURL('image/png');
+        const pieImgWidth = 100; // Adjust as needed
+        const pieImgHeight = pieCanvas.height * pieImgWidth / pieCanvas.width;
+
+        if (y + pieImgHeight > pdf.internal.pageSize.height - 20) { // Check if new page is needed
+          pdf.addPage();
+          y = 10;
+        }
+        pdf.addImage(pieImgData, 'PNG', 10, y, pieImgWidth, pieImgHeight);
+        y += pieImgHeight + 15;
       }
+
+      // Share Classes Table
+      pdf.setFontSize(14);
+      pdf.text('Share Classes Summary', 10, y);
+      y += 7;
+      const shareClassesTableData = companyData.classSummary.map(item => [
+        item.name,
+        item.totalShares.toLocaleString(),
+        `$${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
+        `${item.percentage}%`,
+        item.round
+      ]);
+      pdf.autoTable({
+        startY: y,
+        head: [['Class', 'Shares', 'Value', '%', 'Round']],
+        body: shareClassesTableData,
+        theme: 'grid',
+        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+        styles: { fontSize: 10, cellPadding: 2, overflow: 'linebreak' },
+        margin: { left: 10, right: 10 },
+        didDrawPage: function (data) {
+          y = data.cursor.y; // Update y position after table
+        }
+      });
+      y = pdf.autoTable.previous.finalY + 15;
+
+      // Shareholders Table
+      pdf.setFontSize(14);
+      pdf.text('Shareholders Details', 10, y);
+      y += 7;
+      const shareholdersTableData = shareholderData.map(sh => [
+        sh.name,
+        sh.email,
+        sh.type,
+        sh.totalShares.toLocaleString(),
+        `$${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
+        sh.holdings.map(h => `${h.shareClassName}: ${h.shares.toLocaleString()} @ $${h.price_per_share.toFixed(2)} (Round: ${h.round || 'N/A'})`).join('\n')
+      ]);
+      pdf.autoTable({
+        startY: y,
+        head: [['Name', 'Email', 'Type', 'Total Shares', 'Total Value', 'Holdings']],
+        body: shareholdersTableData,
+        theme: 'grid',
+        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+        styles: { fontSize: 10, cellPadding: 2, overflow: 'linebreak' },
+        columnStyles: { 5: { cellWidth: 60 } }, // Adjust width for holdings column
+        margin: { left: 10, right: 10 },
+        didDrawPage: function (data) {
+          y = data.cursor.y; // Update y position after table
+        }
+      });
+      y = pdf.autoTable.previous.finalY + 15;
+
+      // Share Issuances Table
+      pdf.setFontSize(14);
+      pdf.text('Share Issuances Log', 10, y);
+      y += 7;
+      const issuancesTableData = shareIssuances
+        .filter(issuance => issuance.company_id === selectedCompany.id)
+        .map(issuance => {
+          const shareholder = shareholders.find(s => s.id === issuance.shareholder_id);
+          const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
+          return [
+            issuance.issue_date,
+            issuance.round || 'N/A',
+            shareholder?.name || 'Unknown',
+            shareClass?.name || 'Unknown',
+            issuance.shares.toLocaleString(),
+            `$${issuance.price_per_share.toFixed(2)}`,
+            `$${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+          ];
+        });
+      pdf.autoTable({
+        startY: y,
+        head: [['Date', 'Round', 'Shareholder', 'Share Class', 'Shares', 'Price/Share', 'Total Value']],
+        body: issuancesTableData,
+        theme: 'grid',
+        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
+        styles: { fontSize: 10, cellPadding: 2, overflow: 'linebreak' },
+        margin: { left: 10, right: 10 },
+        didDrawPage: function (data) {
+          y = data.cursor.y; // Update y position after table
+        }
+      });
 
       pdf.save(`${selectedCompany.name}_Equity_Profile.pdf`);
       alert('PDF generated successfully!');
@@ -1069,7 +1174,7 @@ const EquityManagementApp = () => {
 
             {/* Dashboard Tab */}
             {activeTab === 'dashboard' && (
-              <div className="space-y-6" ref={componentRef}> {/* Ref for PDF capture */}
+              <div className="space-y-6" ref={dashboardRef}> {/* Ref for PDF capture */}
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6"> {/* Changed to 4 columns */}
                   <div className="bg-white p-6 rounded-lg shadow">
@@ -1093,7 +1198,7 @@ const EquityManagementApp = () => {
                 {/* Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Share Class Distribution */}
-                  <div className="bg-white p-6 rounded-lg shadow">
+                  <div className="bg-white p-6 rounded-lg shadow" ref={pieChartRef}> {/* Specific ref for pie chart */}
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Share Distribution by Class</h3>
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
@@ -1117,7 +1222,7 @@ const EquityManagementApp = () => {
                   </div>
                   {/* Share Class Summary Table */}
                   <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Share Classes (by Priority)</h3>
+                    <h3 className="lg:text-lg font-medium text-gray-900 mb-4">Share Classes (by Priority)</h3>
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
@@ -1142,72 +1247,6 @@ const EquityManagementApp = () => {
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                </div>
-                 {/* Shareholders Table for PDF */}
-                <div className="bg-white shadow rounded-lg">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 p-6">Shareholders Overview</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Shares</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {shareholderData.map(shareholder => (
-                          <tr key={shareholder.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder.name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.email}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.type}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.totalShares.toLocaleString()}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${shareholder.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                 {/* Issuances Table for PDF */}
-                <div className="bg-white shadow rounded-lg">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 p-6">Share Issuances Details</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shareholder</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Share Class</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price/Share</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {shareIssuances
-                          .filter(issuance => issuance.company_id === selectedCompany.id)
-                          .map(issuance => {
-                            const shareholder = shareholders.find(s => s.id === issuance.shareholder_id);
-                            const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
-                            return (
-                              <tr key={issuance.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.issue_date}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.round || 'N/A'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder?.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareClass?.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.shares.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${issuance.price_per_share.toFixed(2)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                              </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
                 <div className="flex justify-end mt-6">
@@ -1497,7 +1536,7 @@ const Modal = ({ children, onClose }) => (
       </button>
       {children}
     </div>
-  </div>
+  </div> // Corrected closing tag for the inner div
 );
 
 // Form Components
