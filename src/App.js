@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react'; // Added useRef for PDF capture
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download } from 'lucide-react'; // Added Download icon
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 // REMOVED: import { createClient } from '@supabase/supabase-js'; // This import caused resolution issues
@@ -23,6 +23,9 @@ if (typeof window !== 'undefined' && window.supabase) {
 
 
 const EquityManagementApp = () => {
+  // Ref for PDF capture
+  const componentRef = useRef();
+
   // State management
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true); // Global loading state
@@ -48,6 +51,7 @@ const EquityManagementApp = () => {
   const [showCreateIssuance, setShowCreateIssuance] = useState(false);
   const [showBulkAddIssuance, setShowBulkAddIssuance] = useState(false); // New bulk add modal
   const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false); // New bulk add shareholder modal
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false); // For delete account confirmation
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
@@ -334,6 +338,66 @@ const EquityManagementApp = () => {
       setErrorMessage('Error updating password: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setLoading(true);
+    setErrorMessage('');
+    if (!supabase || !user) {
+      setErrorMessage("Supabase client or user not initialized.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Delete all companies owned by the user (this should cascade delete related data)
+      const { error: deleteCompaniesError } = await supabase
+        .from('companies')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (deleteCompaniesError) throw deleteCompaniesError;
+      console.log('User companies and related data deleted.');
+
+      // 2. Delete user profile (if not already cascaded by auth.users deletion, which is not client-side possible)
+      const { error: deleteProfileError } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', user.id);
+
+      if (deleteProfileError) {
+        // Ignore PGRST116 (no rows found) if profile was already deleted by cascade from auth.users
+        if (deleteProfileError.code !== 'PGRST116') {
+          throw deleteProfileError;
+        }
+      }
+      console.log('User profile deleted or not found (expected).');
+
+      // 3. Sign out the user
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+
+      alert('Your account and all associated data in companies, shareholders, share classes, and share issuances have been deleted. You have been logged out.');
+      setCompanies([]);
+      setSelectedCompany(null);
+      setShareholders([]);
+      setShareClasses([]);
+      setShareIssuances([]);
+      setUserProfile(null);
+      setUser(null); // Clear user state
+      setShowLogin(true); // Redirect to login page
+
+      // IMPORTANT NOTE: Deleting the user record from `auth.users` itself requires a Supabase Service Role Key,
+      // which should NEVER be exposed client-side. This client-side function deletes the user's data,
+      // but the core authentication record in `auth.users` remains. For full deletion,
+      // you would need a secure backend function (e.g., Supabase Edge Function) that uses the Service Role Key.
+
+    } catch (error) {
+      setErrorMessage('Error deleting account: ' + error.message + '. Please note that the core authentication record cannot be deleted from the client-side for security reasons.');
+    } finally {
+      setLoading(false);
+      setShowConfirmDeleteModal(false);
     }
   };
 
@@ -746,6 +810,54 @@ const EquityManagementApp = () => {
     }
   };
 
+  // --- PDF Download Function ---
+  const handleDownloadPdf = async () => {
+    if (!selectedCompany || !componentRef.current || !window.html2canvas || !window.jspdf) {
+      setErrorMessage("Cannot generate PDF. Ensure a company is selected and PDF libraries are loaded.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      const input = componentRef.current;
+      const canvas = await window.html2canvas(input, {
+        scale: 2, // Increase scale for better resolution
+        useCORS: true, // Needed if images/fonts are from different origins
+        logging: true,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4'); // 'p' for portrait, 'mm' for millimeters, 'a4' size
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`${selectedCompany.name}_Equity_Profile.pdf`);
+      alert('PDF generated successfully!');
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      setErrorMessage('Failed to generate PDF: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const companyData = getCompanyData();
   const shareholderData = getShareholderData();
 
@@ -937,8 +1049,7 @@ const EquityManagementApp = () => {
                   { id: 'shareholders', name: 'Shareholders', icon: Users },
                   { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
                   { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload }, // New Tab
-                  { id: 'bulk-add-shareholder', name: 'Bulk Add Shareholders', icon: Users }, // New Tab
-                  { id: 'account', name: 'My Account', icon: User } // New Tab
+                  { id: 'account', name: 'My Account', icon: User } // New Tab (Bulk Add Shareholders moved to Shareholders tab)
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -958,7 +1069,7 @@ const EquityManagementApp = () => {
 
             {/* Dashboard Tab */}
             {activeTab === 'dashboard' && (
-              <div className="space-y-6">
+              <div className="space-y-6" ref={componentRef}> {/* Ref for PDF capture */}
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6"> {/* Changed to 4 columns */}
                   <div className="bg-white p-6 rounded-lg shadow">
@@ -1033,6 +1144,81 @@ const EquityManagementApp = () => {
                     </div>
                   </div>
                 </div>
+                 {/* Shareholders Table for PDF */}
+                <div className="bg-white shadow rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 p-6">Shareholders Overview</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Shares</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {shareholderData.map(shareholder => (
+                          <tr key={shareholder.id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.email}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.type}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.totalShares.toLocaleString()}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${shareholder.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                 {/* Issuances Table for PDF */}
+                <div className="bg-white shadow rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 p-6">Share Issuances Details</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shareholder</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Share Class</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price/Share</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {shareIssuances
+                          .filter(issuance => issuance.company_id === selectedCompany.id)
+                          .map(issuance => {
+                            const shareholder = shareholders.find(s => s.id === issuance.shareholder_id);
+                            const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
+                            return (
+                              <tr key={issuance.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.issue_date}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.round || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder?.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareClass?.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.shares.toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${issuance.price_per_share.toFixed(2)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="flex justify-end mt-6">
+                  <button
+                    onClick={handleDownloadPdf}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Company Profile PDF
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1048,6 +1234,13 @@ const EquityManagementApp = () => {
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
                       New Share Class
+                    </button>
+                    <button
+                      onClick={() => setShowBulkAddShareholder(true)} // Button to open bulk add modal
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center"
+                    >
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Bulk Add Shareholders
                     </button>
                     <button
                       onClick={() => setShowCreateShareholder(true)}
@@ -1190,21 +1383,6 @@ const EquityManagementApp = () => {
               </div>
             )}
 
-            {/* Bulk Add Shareholders Tab */}
-            {activeTab === 'bulk-add-shareholder' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-gray-900">Bulk Add Shareholders</h2>
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Add up to 5 new shareholders at a time</h3>
-                  <BulkShareholderForm
-                    onSubmit={createShareholder}
-                    errorMessage={errorMessage}
-                    setErrorMessage={setErrorMessage}
-                  />
-                </div>
-              </div>
-            )}
-
             {/* My Account Tab */}
             {activeTab === 'account' && (
               <div className="space-y-6">
@@ -1216,6 +1394,22 @@ const EquityManagementApp = () => {
                   errorMessage={errorMessage}
                   setErrorMessage={setErrorMessage}
                 />
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Account</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Permanently delete your account and all associated company data. This action cannot be undone.
+                  </p>
+                  <button
+                    onClick={() => setShowConfirmDeleteModal(true)}
+                    className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete My Account
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    *Note: Due to security restrictions, the core authentication record in Supabase `auth.users` cannot be deleted directly from the client-side. This function will delete all your associated company data and user profile, and log you out. For a full deletion of your authentication record, a server-side function using a Supabase Service Role Key is required.
+                  </p>
+                </div>
               </div>
             )}
           </>
@@ -1246,6 +1440,41 @@ const EquityManagementApp = () => {
             onSubmit={createIssuance}
             onCancel={() => setShowCreateIssuance(false)}
           />
+        </Modal>
+      )}
+      {showBulkAddShareholder && (
+        <Modal onClose={() => setShowBulkAddShareholder(false)}>
+          <BulkShareholderForm
+            onSubmit={createShareholder}
+            errorMessage={errorMessage}
+            setErrorMessage={setErrorMessage}
+          />
+        </Modal>
+      )}
+      {showConfirmDeleteModal && (
+        <Modal onClose={() => setShowConfirmDeleteModal(false)}>
+          <div className="p-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Account Deletion</h3>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to delete your account? This will delete **all** your companies, shareholders, share classes, and share issuances. This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDeleteModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
@@ -1923,5 +2152,4 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
     </div>
   );
 };
-
 export default EquityManagementApp;
