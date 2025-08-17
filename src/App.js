@@ -53,6 +53,7 @@ const EquityManagementApp = () => {
   const [showBulkAddIssuance, setShowBulkAddIssuance] = useState(false); // New bulk add modal
   const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false); // New bulk add shareholder modal
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false); // For delete account confirmation
+  const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false); // For deactivate account confirmation
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
@@ -353,6 +354,7 @@ const EquityManagementApp = () => {
 
     try {
       // 1. Delete all companies owned by the user (this should cascade delete related data)
+      // This relies on the RLS DELETE policy for 'companies' being correctly set.
       const { error: deleteCompaniesError } = await supabase
         .from('companies')
         .delete()
@@ -395,12 +397,60 @@ const EquityManagementApp = () => {
       // you would need a secure backend function (e.g., Supabase Edge Function) that uses the Service Role Key.
 
     } catch (error) {
-      setErrorMessage('Error deleting account: ' + error.message + '. Please note that the core authentication record cannot be deleted from the client-side for security reasons.');
+      setErrorMessage('Error deleting account: ' + error.message + '. Please ensure the DELETE RLS policy for companies is correctly set. Note: the core authentication record cannot be deleted from the client-side for security reasons.');
     } finally {
       setLoading(false);
       setShowConfirmDeleteModal(false);
     }
   };
+
+  const handleDeactivateAccount = async () => {
+    if (!user || !supabase) {
+        setErrorMessage("User not logged in or Supabase client not initialized.");
+        return;
+    }
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+        const currentEmail = user.email;
+        const timestamp = new Date().getTime();
+        // Change email to something unique to free up the original email for new sign-ups
+        const newEmail = `${currentEmail.split('@')[0]}[inactive-${timestamp}]@${currentEmail.split('@')[1]}`;
+
+        // 1. Update email in auth.users
+        const { data: authUpdateData, error: authUpdateError } = await supabase.auth.updateUser({
+            email: newEmail,
+        });
+
+        if (authUpdateError) throw authUpdateError;
+        console.log('User email updated to inactive:', newEmail);
+
+        // 2. Update status in user_profiles table
+        const { error: profileUpdateError } = await supabase
+            .from('user_profiles')
+            .update({ status: 'inactive' })
+            .eq('id', user.id);
+
+        if (profileUpdateError) throw profileUpdateError;
+        console.log('User profile status set to inactive.');
+
+        // 3. Sign out the user
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw signOutError;
+
+        alert('Your account has been deactivated and you have been logged out. You can now create a new account with your original email.');
+        setUser(null); // Clear user state
+        setShowLogin(true); // Redirect to login page
+
+    } catch (error) {
+        setErrorMessage('Error deactivating account: ' + error.message);
+    } finally {
+        setLoading(false);
+        setShowConfirmDeactivateModal(false);
+    }
+};
+
 
   // --- Dummy Data Creation for New Users ---
   const createSampleDataForNewUser = async (userId) => {
@@ -1434,19 +1484,28 @@ const EquityManagementApp = () => {
                   setErrorMessage={setErrorMessage}
                 />
                 <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Account</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Account Management</h3>
                   <p className="text-sm text-gray-600 mb-4">
-                    Permanently delete your account and all associated company data. This action cannot be undone.
+                    Deactivate your account to free up your email for new sign-ups, or permanently delete your account and all associated company data.
                   </p>
-                  <button
-                    onClick={() => setShowConfirmDeleteModal(true)}
-                    className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete My Account
-                  </button>
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => setShowConfirmDeactivateModal(true)}
+                      className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 flex items-center"
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      Deactivate Account
+                    </button>
+                    <button
+                      onClick={() => setShowConfirmDeleteModal(true)}
+                      className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete My Account
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    *Note: Due to security restrictions, the core authentication record in Supabase `auth.users` cannot be deleted directly from the client-side. This function will delete all your associated company data and user profile, and log you out. For a full deletion of your authentication record, a server-side function using a Supabase Service Role Key is required.
+                    *Note: Deactivating changes your email and status. Deleting removes your data. The core authentication record in Supabase `auth.users` cannot be deleted directly from the client-side for security reasons.
                   </p>
                 </div>
               </div>
@@ -1516,6 +1575,32 @@ const EquityManagementApp = () => {
           </div>
         </Modal>
       )}
+      {showConfirmDeactivateModal && (
+        <Modal onClose={() => setShowConfirmDeactivateModal(false)}>
+          <div className="p-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Account Deactivation</h3>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to deactivate your account? Your email will be changed to free it up for new sign-ups, and your profile status will be set to 'inactive'. You will be logged out.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDeactivateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeactivateAccount}
+                className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-700"
+              >
+                Confirm Deactivate
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
@@ -1536,7 +1621,7 @@ const Modal = ({ children, onClose }) => (
       </button>
       {children}
     </div>
-  </div> // Corrected closing tag for the inner div
+  </div>
 );
 
 // Form Components
