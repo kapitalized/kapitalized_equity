@@ -1,0 +1,3 @@
+supabase-py
+Flask # Or FastAPI, depending on preference. Flask is simple for this.
+python-dotenv # For local development, not strictly needed for Cloud Functions env vars
