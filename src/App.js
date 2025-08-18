@@ -21,6 +21,10 @@ if (typeof window !== 'undefined' && window.supabase) {
   console.error("Supabase client not found on window. Ensure CDN script is loaded.");
 }
 
+// IMPORTANT: Replace with the URL of your Vercel Serverless Function
+// When deployed on Vercel, this will typically be /api/equity-calculator
+const PYTHON_BACKEND_URL = "/api/equity-calculator";
+
 
 const EquityManagementApp = () => {
   // Refs for PDF capture
@@ -54,7 +58,20 @@ const EquityManagementApp = () => {
   const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false); // New bulk add shareholder modal
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false); // For delete account confirmation
   const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false); // For deactivate account confirmation
-  const [showLoginDetailsModal, setShowLoginDetailsModal] = useState(false); // For login details modal
+  const [showLoginDetailsDropdown, setShowLoginDetailsDropdown] = useState(false); // For login details dropdown
+
+  // New states for Reports tab
+  const [futureIssuanceData, setFutureIssuanceData] = useState({
+    shareholderId: '',
+    shareClassId: '',
+    shares: '',
+    pricePerShare: '',
+    issueDate: new Date().toISOString().split('T')[0],
+    round: 'Future Scenario'
+  });
+  const [futureScenarioResults, setFutureScenarioResults] = useState(null);
+  const [selectedRound, setSelectedRound] = useState('current'); // 'current' or a specific round name
+
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
@@ -286,7 +303,8 @@ const EquityManagementApp = () => {
         throw error;
       }
       setUserProfile(data);
-    } catch (error) {
+    }
+    catch (error) {
       setErrorMessage('Error fetching profile: ' + error.message);
     }
   };
@@ -440,7 +458,9 @@ const EquityManagementApp = () => {
         // Generate a valid email alias: original_local_part+inactive-timestamp@domain.com
         // This is a common and valid way to "deactivate" an email without changing the core user identity.
         const [localPart, domain] = currentEmail.split('@');
-        const newEmail = `${localPart}+inactive-${timestamp}@${domain}`;
+        // Ensure the local part doesn't contain '+' already to avoid multiple '+inactive'
+        const cleanLocalPart = localPart.split('+')[0];
+        const newEmail = `${cleanLocalPart}+inactive-${timestamp}@${domain}`;
 
         // 1. Update email in auth.users
         const { data: authUpdateData, error: authUpdateError } = await supabase.auth.updateUser({
@@ -765,15 +785,13 @@ const EquityManagementApp = () => {
   };
 
   // --- Data processing for Dashboard ---
-  const getCompanyData = () => {
+  const getCompanyData = (issuancesToProcess = shareIssuances) => {
     if (!selectedCompany) return { totalShares: 0, totalValue: 0, classSummary: [], latestValuationPerShare: 0, companyValuation: 0 };
 
-    const companyIssuances = shareIssuances.filter(i => i.company_id === selectedCompany.id);
+    const companyIssuances = issuancesToProcess.filter(i => i.company_id === selectedCompany.id);
 
-    // Calculate latest valuation per share across all issuances for this company
     let latestValuationPerShare = 0;
     if (companyIssuances.length > 0) {
-      // Sort issuances by issue_date descending, then by created_at descending (if dates are same)
       const sortedIssuances = _.orderBy(companyIssuances, ['issue_date', 'created_at'], ['desc', 'desc']);
       latestValuationPerShare = sortedIssuances[0].price_per_share;
     }
@@ -783,15 +801,15 @@ const EquityManagementApp = () => {
       .map((issuances, shareClassId) => {
         const shareClass = shareClasses.find(sc => sc.id == shareClassId);
         const totalShares = _.sumBy(issuances, 'shares');
-        const totalValue = _.sumBy(issuances, i => i.shares * i.price_per_share); // Value per issuance
-        const issuanceRound = issuances[0]?.round || 'N/A'; // Assuming one round per grouped class for simplicity, or pick first
+        const totalValue = _.sumBy(issuances, i => i.shares * i.price_per_share);
+        const issuanceRound = issuances[0]?.round || 'N/A';
 
         return {
           id: shareClassId,
           name: shareClass?.name || 'Unknown',
           priority: shareClass?.priority || 999,
           totalShares,
-          totalValue, // Sum of (shares * price_per_share) for this class
+          totalValue,
           percentage: 0,
           round: issuanceRound,
         };
@@ -800,10 +818,9 @@ const EquityManagementApp = () => {
       .value();
 
     const totalShares = _.sumBy(classSummary, 'totalShares');
-    const totalValue = _.sumBy(classSummary, 'totalValue'); // Sum of values across all classes
-    const companyValuation = totalShares * latestValuationPerShare; // Company valuation based on total shares and latest price
+    const totalValue = _.sumBy(classSummary, 'totalValue');
+    const companyValuation = totalShares * latestValuationPerShare;
 
-    // Calculate percentages
     classSummary.forEach(item => {
       item.percentage = totalShares > 0 ? (item.totalShares / totalShares * 100).toFixed(2) : 0;
     });
@@ -811,9 +828,9 @@ const EquityManagementApp = () => {
     return { totalShares, totalValue, classSummary, latestValuationPerShare, companyValuation };
   };
 
-  const getShareholderData = () => {
+  const getShareholderData = (issuancesToProcess = shareIssuances) => {
     if (!selectedCompany) return [];
-    const companyIssuances = shareIssuances.filter(i => i.company_id === selectedCompany.id);
+    const companyIssuances = issuancesToProcess.filter(i => i.company_id === selectedCompany.id);
 
     return _(companyIssuances)
       .groupBy('shareholder_id')
@@ -840,6 +857,88 @@ const EquityManagementApp = () => {
       .orderBy('totalShares', 'desc')
       .value();
   };
+
+  // --- Calculations via Python Backend ---
+  const fetchEquityCalculations = async (futureIssuance = null) => {
+    if (!selectedCompany || !PYTHON_BACKEND_URL) {
+      setErrorMessage("Company not selected or Python backend URL not configured.");
+      return null;
+    }
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      // Pass all necessary current data to the backend for calculation
+      const payload = {
+        companyId: selectedCompany.id,
+        currentIssuances: shareIssuances, // Pass current issuances
+        shareholders: shareholders, // Pass current shareholders
+        shareClasses: shareClasses, // Pass current share classes
+        futureIssuance: futureIssuance // Pass future issuance if it's a scenario calculation
+      };
+
+      const response = await fetch(PYTHON_BACKEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const result = await response.json();
+      return result;
+
+    } catch (error) {
+      console.error("Error fetching equity calculations from backend:", error);
+      setErrorMessage('Error fetching equity calculations: ' + error.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Handle Future Scenario Calculation ---
+  const handleCalculateFutureScenario = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    const results = await fetchEquityCalculations(futureIssuanceData);
+    if (results) {
+      setFutureScenarioResults(results);
+    }
+  };
+
+  // --- Get data for specific round (or current) ---
+  const getEquityDataForRound = (roundName) => {
+    if (roundName === 'current') {
+      return {
+        companyData: getCompanyData(shareIssuances),
+        shareholderData: getShareholderData(shareIssuances)
+      };
+    } else {
+      // Filter issuances by the selected round name
+      const issuancesForRound = shareIssuances.filter(issuance => issuance.round === roundName);
+      return {
+        companyData: getCompanyData(issuancesForRound),
+        shareholderData: getShareholderData(issuancesForRound)
+      };
+    }
+  };
+
+  const currentEquityData = getEquityDataForRound('current');
+  const displayEquityData = selectedRound === 'current' ? currentEquityData : getEquityDataForRound(selectedRound);
+
+  // Get unique rounds for the dropdown
+  const uniqueRounds = _.chain(shareIssuances)
+    .map('round')
+    .compact() // Remove null/undefined rounds
+    .uniq()
+    .value();
+
 
   // --- CSV Upload handler (simplified, needs robust parsing for production) ---
   const handleCsvUpload = (event) => {
@@ -1236,19 +1335,19 @@ const EquityManagementApp = () => {
             {/* My Account Dropdown */}
             <div className="relative">
               <button
-                onClick={() => setShowLoginDetailsModal(!showLoginDetailsModal)}
+                onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)}
                 className="flex items-center text-sm text-gray-600 hover:text-gray-800 focus:outline-none"
               >
                 <User className="h-5 w-5 mr-1" />
                 {userProfile?.username || user?.email || 'My Account'} <ChevronDown className="ml-1 h-4 w-4" />
               </button>
-              {showLoginDetailsModal && (
+              {showLoginDetailsDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
                   <button
-                    onClick={() => { setActiveTab('account'); setShowLoginDetailsModal(false); }}
+                    onClick={() => { setActiveTab('account'); setShowLoginDetailsDropdown(false); }}
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                   >
-                    Login Details
+                    My Account
                   </button>
                   <button
                     onClick={handleLogout}
@@ -1571,7 +1670,214 @@ const EquityManagementApp = () => {
             {/* Reports Tab */}
             {activeTab === 'reports' && (
               <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-gray-900">Reports</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Reports & Scenarios</h2>
+                
+                {/* Current Status */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Current Equity Status</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    View the current equity distribution and valuation.
+                  </p>
+                  <button
+                    onClick={() => setSelectedRound('current')}
+                    className={`px-4 py-2 rounded-md flex items-center ${selectedRound === 'current' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  >
+                    Show Current Status
+                  </button>
+                  {selectedRound === 'current' && (
+                    <div className="mt-4">
+                      {/* Display current status data */}
+                      <h4 className="font-semibold text-gray-800 mt-2">Current Company Overview:</h4>
+                      <p>Total Shares: {currentEquityData.companyData.totalShares.toLocaleString()}</p>
+                      <p>Total Value: ${currentEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                      <h4 className="font-semibold text-gray-800 mt-2">Current Shareholder Holdings:</h4>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {currentEquityData.shareholderData.map(sh => (
+                              <tr key={sh.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {((sh.totalShares / currentEquityData.companyData.totalShares) * 100).toFixed(2)}%
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Past Rounds */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Historical Rounds Analysis</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Analyze equity distribution and valuation at specific past issuance rounds.
+                  </p>
+                  <select
+                    value={selectedRound}
+                    onChange={(e) => setSelectedRound(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                  >
+                    <option value="current">Select a Round...</option>
+                    {uniqueRounds.map(round => (
+                      <option key={round} value={round}>{round}</option>
+                    ))}
+                  </select>
+                  {selectedRound !== 'current' && selectedRound !== '' && (
+                    <div className="mt-4">
+                      <h4 className="font-semibold text-gray-800 mt-2">Equity Status at {selectedRound}:</h4>
+                      <p>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
+                      <p>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                      <h4 className="font-semibold text-gray-800 mt-2">Shareholder Holdings at {selectedRound}:</h4>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {displayEquityData.shareholderData.map(sh => (
+                              <tr key={sh.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {((sh.totalShares / displayEquityData.companyData.totalShares) * 100).toFixed(2)}%
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Future Scenario */}
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Future Scenario Planning</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Input a hypothetical future issuance to see its impact on current equity distribution.
+                  </p>
+                  <form onSubmit={handleCalculateFutureScenario} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder for Future Issuance</label>
+                      <select
+                        value={futureIssuanceData.shareholderId}
+                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareholderId: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select Shareholder</option>
+                        {shareholders.map(sh => (
+                          <option key={sh.id} value={sh.id}>{sh.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Share Class for Future Issuance</label>
+                      <select
+                        value={futureIssuanceData.shareClassId}
+                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareClassId: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select Share Class</option>
+                        {shareClasses.map(sc => (
+                          <option key={sc.id} value={sc.id}>{sc.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Shares (Future Issuance)</label>
+                      <input
+                        type="number"
+                        value={futureIssuanceData.shares}
+                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shares: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-sm text-gray-700 mb-1">Price per Share ($) (Future Issuance)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={futureIssuanceData.pricePerShare}
+                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, pricePerShare: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="0"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date (Future Issuance)</label>
+                      <input
+                        type="date"
+                        value={futureIssuanceData.issueDate}
+                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, issueDate: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
+                      disabled={loading}
+                    >
+                      {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Calculate Future Scenario
+                    </button>
+                  </form>
+                  {futureScenarioResults && (
+                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">Future Scenario Results:</h4>
+                      <p>Total Shares (Future): {futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
+                      <p>Total Value (Future): ${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                      <h5 className="font-semibold text-gray-800 mt-3">Shareholder Impact:</h5>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current %</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Future %</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Change</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {futureScenarioResults.future_state.shareholderSummary.map(sh => (
+                              <tr key={sh.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.currentPercentage.toFixed(2)}%</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.futurePercentage.toFixed(2)}%</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.percentageChange.toFixed(2)}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="bg-white p-6 rounded-lg shadow">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Company Profile Report (PDF)</h3>
                   <p className="text-sm text-gray-600 mb-4">
@@ -1692,6 +1998,7 @@ const EquityManagementApp = () => {
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
                 Cancel
+
               </button>
               <button
                 type="button"
