@@ -2,24 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'; // Added useRef for 
 import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown } from 'lucide-react'; // Added Download and ChevronDown icons
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
-// REMOVED: import { createClient } from '@supabase/supabase-js'; // This import caused resolution issues
-
-// Initialize Supabase Client directly from the global window object.
-// This requires the Supabase CDN script to be loaded in public/index.html.
-// For Vercel deployment, ensure your REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY
-// environment variables are correctly set in Vercel.
-const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
-// IMPORTANT: Replaced with your CURRENT Supabase Anon Key
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn3dmwrBqzR2s9dzCn6GxqslhlU7iiE";
-
-let supabase = null;
-// Check if window.supabase exists (meaning the CDN script has loaded)
-if (typeof window !== 'undefined' && window.supabase) {
-  supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  // This might happen if the CDN script hasn't loaded yet, or in a server-side rendering context
-  console.error("Supabase client not found on window. Ensure CDN script is loaded.");
-}
+import { supabase } from './config/supabase'; // IMPORTED FROM NEW FILE
 
 // IMPORTANT: Replace with the URL of your Vercel Serverless Function
 // When deployed on Vercel, this will typically be /api/equity-calculator
