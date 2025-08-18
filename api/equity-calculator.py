@@ -6,14 +6,14 @@ import pandas as pd
 from datetime import datetime
 from supabase import create_client, Client
 
-# Supabase client initialization
+# Supabase client initialization (still needed for potential future direct DB ops, but not for fetching current data in this scenario)
 # IMPORTANT: These should be set as environment variables in your Vercel project
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") # Use Service Role Key for backend security
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     # In a real production environment, you'd want more robust error handling/logging here
-    print("Error: Supabase URL or Key environment variables are not set.")
+    print("Error: Supabase URL or Key environment variables are not set for the backend.")
     supabase = None # Set to None if not configured, handle gracefully below
 else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -67,56 +67,60 @@ def calculate_equity_snapshot(issuances_data, shareholders_data, share_classes_d
 
     class_summary = []
     for _, row in class_summary_raw.iterrows():
-        share_class = df_share_classes[df_share_classes['id'] == row['share_class_id']].iloc[0]
-        percentage = (row['totalShares'] / total_shares * 100) if total_shares > 0 else 0
-        
-        # Determine the round for the class summary (can be complex if a class has multiple rounds)
-        # For simplicity, we'll just take the round from the first issuance in that class group
-        # A more robust solution might involve grouping by (share_class_id, round)
-        issuances_for_class = df_issuances[df_issuances['share_class_id'] == row['share_class_id']]
-        round_name = issuances_for_class['round'].iloc[0] if not issuances_for_class.empty else 'N/A'
+        # Ensure share_class is found before accessing its properties
+        share_class_match = df_share_classes[df_share_classes['id'] == row['share_class_id']]
+        if not share_class_match.empty:
+            share_class = share_class_match.iloc[0]
+            percentage = (row['totalShares'] / total_shares * 100) if total_shares > 0 else 0
+            
+            # Determine the round for the class summary (can be complex if a class has multiple rounds)
+            issuances_for_class = df_issuances[df_issuances['share_class_id'] == row['share_class_id']]
+            round_name = issuances_for_class['round'].iloc[0] if not issuances_for_class.empty else 'N/A'
 
-        class_summary.append({
-            "id": int(share_class['id']),
-            "name": share_class['name'],
-            "priority": int(share_class['priority']),
-            "totalShares": int(row['totalShares']),
-            "totalValue": float(row['totalValue']),
-            "percentage": round(percentage, 2),
-            "round": round_name
-        })
+            class_summary.append({
+                "id": int(share_class['id']),
+                "name": share_class['name'],
+                "priority": int(share_class['priority']),
+                "totalShares": int(row['totalShares']),
+                "totalValue": float(row['totalValue']),
+                "percentage": round(percentage, 2),
+                "round": round_name
+            })
     class_summary = sorted(class_summary, key=lambda x: x['priority'])
 
     # --- Shareholder Summary ---
     shareholder_summary = []
     shareholder_groups = df_issuances.groupby('shareholder_id')
     for shareholder_id, group in shareholder_groups:
-        shareholder = df_shareholders[df_shareholders['id'] == shareholder_id].iloc[0]
-        total_shares_sh = group['shares'].sum()
-        total_value_sh = group['value'].sum()
-        
-        holdings = []
-        for _, issuance in group.iterrows():
-            share_class = df_share_classes[df_share_classes['id'] == issuance['share_class_id']].iloc[0]
-            holdings.append({
-                "id": int(issuance['id']),
-                "shares": int(issuance['shares']),
-                "price_per_share": float(issuance['price_per_share']),
-                "issue_date": issuance['issue_date'].strftime('%Y-%m-%d'),
-                "shareClassName": share_class['name'],
-                "valuation": float(issuance['value']),
-                "round": issuance['round']
+        shareholder_match = df_shareholders[df_shareholders['id'] == shareholder_id]
+        if not shareholder_match.empty:
+            shareholder = shareholder_match.iloc[0]
+            total_shares_sh = group['shares'].sum()
+            total_value_sh = group['value'].sum()
+            
+            holdings = []
+            for _, issuance in group.iterrows():
+                share_class_match = df_share_classes[df_share_classes['id'] == issuance['share_class_id']]
+                share_class_name = share_class_match.iloc[0]['name'] if not share_class_match.empty else 'Unknown'
+                holdings.append({
+                    "id": int(issuance['id']),
+                    "shares": int(issuance['shares']),
+                    "price_per_share": float(issuance['price_per_share']),
+                    "issue_date": issuance['issue_date'].strftime('%Y-%m-%d'),
+                    "shareClassName": share_class_name,
+                    "valuation": float(issuance['value']),
+                    "round": issuance['round']
+                })
+            
+            shareholder_summary.append({
+                "id": int(shareholder['id']),
+                "name": shareholder['name'],
+                "email": shareholder['email'],
+                "type": shareholder['type'],
+                "totalShares": int(total_shares_sh),
+                "totalValue": float(total_value_sh),
+                "holdings": holdings
             })
-        
-        shareholder_summary.append({
-            "id": int(shareholder['id']),
-            "name": shareholder['name'],
-            "email": shareholder['email'],
-            "type": shareholder['type'],
-            "totalShares": int(total_shares_sh),
-            "totalValue": float(total_value_sh),
-            "holdings": holdings
-        })
     shareholder_summary = sorted(shareholder_summary, key=lambda x: x['totalShares'], reverse=True)
 
     return {
@@ -143,28 +147,20 @@ def handler(request, context):
 
     if request.method == 'POST':
         try:
-            if supabase is None:
-                return jsonify({"error": "Supabase client not initialized. Check environment variables."}), 500
-
+            # Removed Supabase client initialization check here, as it's done globally.
+            # If supabase is None, it means env vars were not set at startup.
+            
             data = request.get_json()
             company_id = data.get('companyId')
+            current_issuances = data.get('currentIssuances', []) # Get data from payload
+            shareholders = data.get('shareholders', [])       # Get data from payload
+            share_classes = data.get('shareClasses', [])       # Get data from payload
             future_issuance = data.get('futureIssuance')
             
             if not company_id:
                 return jsonify({"error": "companyId is required"}), 400
 
-            # Fetch current data for the company
-            # Using Supabase Python client to fetch data
-            # Note: Ensure your Supabase RLS policies allow the SERVICE_ROLE_KEY to read these tables
-            response_issuances = supabase.from('share_issuances').select('*').eq('company_id', company_id).execute()
-            response_shareholders = supabase.from('shareholders').select('*').eq('company_id', company_id).execute()
-            response_share_classes = supabase.from('share_classes').select('*').eq('company_id', company_id).execute()
-
-            current_issuances = response_issuances.data if response_issuances.data else []
-            shareholders = response_shareholders.data if response_shareholders.data else []
-            share_classes = response_share_classes.data if response_share_classes.data else []
-
-            # Calculate current state
+            # Calculate current state using data from payload
             current_state_data = calculate_equity_snapshot(current_issuances, shareholders, share_classes)
 
             # Calculate future scenario if provided
@@ -182,28 +178,27 @@ def handler(request, context):
                     "shares": int(future_issuance['shares']),
                     "price_per_share": float(future_issuance['pricePerShare']),
                     "issue_date": future_issuance['issueDate'],
-                    "round": future_issuance['round'] or 'Future Scenario'
+                    "round": future_issuance['round'] or 'Future Scenario',
+                    "created_at": datetime.now().isoformat() # Add created_at for sorting
                 }
                 future_issuances.append(future_issuance_processed)
                 
                 future_state_data = calculate_equity_snapshot(future_issuances, shareholders, share_classes)
 
                 # Calculate percentage change for shareholders
+                # We need to get the "current" percentages based on current_state_data
+                current_shareholder_percentages = {
+                    sh['id']: (sh['totalShares'] / current_state_data['totalShares'] * 100) if current_state_data['totalShares'] > 0 else 0
+                    for sh in current_state_data['shareholderSummary']
+                }
+
                 for sh_future in future_state_data['shareholderSummary']:
-                    sh_current = next((sh for sh in current_state_data['shareholderSummary'] if sh['id'] == sh_future['id']), None)
-                    if sh_current:
-                        current_percentage = (sh_current['totalShares'] / current_state_data['totalShares'] * 100) if current_state_data['totalShares'] > 0 else 0
-                        future_percentage = (sh_future['totalShares'] / future_state_data['totalShares'] * 100) if future_state_data['totalShares'] > 0 else 0
-                        
-                        sh_future['percentageChange'] = round(future_percentage - current_percentage, 2)
-                        sh_future['currentPercentage'] = round(current_percentage, 2)
-                        sh_future['futurePercentage'] = round(future_percentage, 2)
-                    else:
-                        # New shareholder in future scenario
-                        future_percentage = (sh_future['totalShares'] / future_state_data['totalShares'] * 100) if future_state_data['totalShares'] > 0 else 0
-                        sh_future['percentageChange'] = round(future_percentage, 2) # New shareholder, 0% current
-                        sh_future['currentPercentage'] = 0
-                        sh_future['futurePercentage'] = round(future_percentage, 2)
+                    current_percentage = current_shareholder_percentages.get(sh_future['id'], 0)
+                    future_percentage = (sh_future['totalShares'] / future_state_data['totalShares'] * 100) if future_state_data['totalShares'] > 0 else 0
+                    
+                    sh_future['percentageChange'] = round(future_percentage - current_percentage, 2)
+                    sh_future['currentPercentage'] = round(current_percentage, 2)
+                    sh_future['futurePercentage'] = round(future_percentage, 2)
 
             response_data = {
                 "current_state": current_state_data,
@@ -226,4 +221,9 @@ def handler(request, context):
 # if __name__ == '__main__':
 #     from dotenv import load_dotenv
 #     load_dotenv() # Load .env file for local development
-#     app.run(debug=True)
+#     # You might need to mock request object for local testing if not using Flask's dev server
+#     # from flask import Flask
+#     # app = Flask(__name__)
+#     # with app.test_request_context(json={'companyId': 1, 'currentIssuances': [], 'shareholders': [], 'shareClasses': []}):
+#     #     response = handler(request, None)
+#     #     print(response.get_data())
