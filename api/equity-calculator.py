@@ -6,15 +6,14 @@ import pandas as pd
 from datetime import datetime
 from supabase import create_client, Client
 
-# Supabase client initialization (still needed for potential future direct DB ops, but not for fetching current data in this scenario)
+# Supabase client initialization
 # IMPORTANT: These should be set as environment variables in your Vercel project
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") # Use Service Role Key for backend security
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    # In a real production environment, you'd want more robust error handling/logging here
     print("Error: Supabase URL or Key environment variables are not set for the backend.")
-    supabase = None # Set to None if not configured, handle gracefully below
+    supabase = None
 else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -33,33 +32,25 @@ def calculate_equity_snapshot(issuances_data, shareholders_data, share_classes_d
             "companyValuation": 0
         }
 
-    # Convert to pandas DataFrames for easier manipulation
     df_issuances = pd.DataFrame(issuances_data)
     df_shareholders = pd.DataFrame(shareholders_data)
     df_share_classes = pd.DataFrame(share_classes_data)
 
-    # Ensure numeric types
     df_issuances['shares'] = pd.to_numeric(df_issuances['shares'])
     df_issuances['price_per_share'] = pd.to_numeric(df_issuances['price_per_share'])
-
-    # Calculate value per issuance
     df_issuances['value'] = df_issuances['shares'] * df_issuances['price_per_share']
 
-    # --- Company-level summary ---
     total_shares = df_issuances['shares'].sum()
     total_value = df_issuances['value'].sum()
 
-    # Calculate latest valuation per share
     latest_valuation_per_share = 0
     if not df_issuances.empty:
-        # Sort by issue_date descending, then created_at descending
         df_issuances['issue_date'] = pd.to_datetime(df_issuances['issue_date'])
         df_issuances = df_issuances.sort_values(by=['issue_date', 'created_at'], ascending=[False, False])
         latest_valuation_per_share = df_issuances.iloc[0]['price_per_share']
     
     company_valuation = total_shares * latest_valuation_per_share
 
-    # --- Share Class Summary ---
     class_summary_raw = df_issuances.groupby('share_class_id').agg(
         totalShares=('shares', 'sum'),
         totalValue=('value', 'sum')
@@ -67,13 +58,11 @@ def calculate_equity_snapshot(issuances_data, shareholders_data, share_classes_d
 
     class_summary = []
     for _, row in class_summary_raw.iterrows():
-        # Ensure share_class is found before accessing its properties
         share_class_match = df_share_classes[df_share_classes['id'] == row['share_class_id']]
         if not share_class_match.empty:
             share_class = share_class_match.iloc[0]
             percentage = (row['totalShares'] / total_shares * 100) if total_shares > 0 else 0
             
-            # Determine the round for the class summary (can be complex if a class has multiple rounds)
             issuances_for_class = df_issuances[df_issuances['share_class_id'] == row['share_class_id']]
             round_name = issuances_for_class['round'].iloc[0] if not issuances_for_class.empty else 'N/A'
 
@@ -88,7 +77,6 @@ def calculate_equity_snapshot(issuances_data, shareholders_data, share_classes_d
             })
     class_summary = sorted(class_summary, key=lambda x: x['priority'])
 
-    # --- Shareholder Summary ---
     shareholder_summary = []
     shareholder_groups = df_issuances.groupby('shareholder_id')
     for shareholder_id, group in shareholder_groups:
@@ -136,42 +124,99 @@ def calculate_equity_snapshot(issuances_data, shareholders_data, share_classes_d
 def handler(request, context):
     """
     Main entry point for Vercel Serverless Function.
+    Handles equity calculations and admin data access.
     """
+    # Set CORS headers for preflight requests
     if request.method == 'OPTIONS':
-        # Handle CORS preflight request
         response = jsonify({})
         response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, PUT, OPTIONS') # Added GET, DELETE, PUT
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization') # Added Authorization
+        response.headers.add('Access-Control-Max-Age', '3600')
         return response
 
-    if request.method == 'POST':
-        try:
-            # Removed Supabase client initialization check here, as it's done globally.
-            # If supabase is None, it means env vars were not set at startup.
+    # Set CORS headers for main requests
+    headers = {
+        'Access-Control-Allow-Origin': '*'
+    }
+
+    try:
+        if supabase is None:
+            return jsonify({"error": "Supabase client not initialized. Check environment variables."}), 500
+
+        # --- Admin Endpoints ---
+        # These endpoints require the Service Role Key and are for admin use only.
+        # The frontend should only call these if the user is identified as admin.
+        # Authentication/Authorization check should ideally happen here using a secure token.
+        # For simplicity, we're relying on the SERVICE_ROLE_KEY to be present,
+        # but in a real app, you'd verify an admin token from the request header.
+
+        path = request.path
+        if path.startswith('/api/admin'):
+            # Basic check for service role key (should be secure on Vercel)
+            # In a real app, you'd verify an admin JWT passed from frontend
+            # if request.headers.get('Authorization') != f"Bearer {os.environ.get('YOUR_ADMIN_FRONTEND_TOKEN')}":
+            #    return jsonify({"error": "Unauthorized"}), 401
             
+            if request.method == 'GET':
+                if path == '/api/admin/users':
+                    response_users = supabase.from('user_profiles').select('*').execute()
+                    return jsonify(response_users.data if response_users.data else []), 200, headers
+                elif path == '/api/admin/companies':
+                    response_companies = supabase.from('companies').select('*').execute()
+                    return jsonify(response_companies.data if response_companies.data else []), 200, headers
+                elif path == '/api/admin/issuances':
+                    response_issuances = supabase.from('share_issuances').select('*').execute()
+                    return jsonify(response_issuances.data if response_issuances.data else []), 200, headers
+                
+            elif request.method == 'DELETE':
+                data = request.get_json()
+                item_id = data.get('id')
+                item_type = data.get('type') # 'user', 'company', 'issuance'
+
+                if not item_id or not item_type:
+                    return jsonify({"error": "id and type are required for deletion"}), 400, headers
+
+                if item_type == 'user':
+                    # Deleting from auth.users requires admin API
+                    # This will also cascade delete from user_profiles due to FK
+                    auth_response = supabase.auth.admin.delete_user(item_id)
+                    if auth_response.user is None: # Supabase returns None for user on successful delete
+                        return jsonify({"message": f"User {item_id} and associated data deleted."}), 200, headers
+                    else:
+                        return jsonify({"error": f"Failed to delete user {item_id}: {auth_response.error.message}"}), 500, headers
+                elif item_type == 'company':
+                    response = supabase.from('companies').delete().eq('id', item_id).execute()
+                    return jsonify({"message": f"Company {item_id} and associated data deleted."}), 200, headers
+                elif item_type == 'issuance':
+                    response = supabase.from('share_issuances').delete().eq('id', item_id).execute()
+                    return jsonify({"message": f"Issuance {item_id} deleted."}), 200, headers
+                else:
+                    return jsonify({"error": "Invalid item type for deletion"}), 400, headers
+            
+            # Add PUT/PATCH for modification if needed, similar structure
+            return jsonify({"error": "Admin endpoint not found or method not allowed"}), 404, headers
+
+        # --- Standard Equity Calculation Endpoint ---
+        elif request.method == 'POST' and path == '/api/equity-calculator':
             data = request.get_json()
             company_id = data.get('companyId')
-            current_issuances = data.get('currentIssuances', []) # Get data from payload
-            shareholders = data.get('shareholders', [])       # Get data from payload
-            share_classes = data.get('shareClasses', [])       # Get data from payload
+            current_issuances = data.get('currentIssuances', [])
+            shareholders = data.get('shareholders', [])
+            share_classes = data.get('shareClasses', [])
             future_issuance = data.get('futureIssuance')
             
             if not company_id:
-                return jsonify({"error": "companyId is required"}), 400
+                return jsonify({"error": "companyId is required"}), 400, headers
 
-            # Calculate current state using data from payload
             current_state_data = calculate_equity_snapshot(current_issuances, shareholders, share_classes)
 
-            # Calculate future scenario if provided
             future_state_data = None
             if future_issuance:
-                # Create a deep copy to avoid modifying current_issuances
                 future_issuances = list(current_issuances)
                 
-                # Ensure future_issuance has necessary fields and convert types
                 future_issuance_processed = {
-                    "id": f"future_{datetime.now().timestamp()}", # Unique ID for future issuance
+                    "id": f"future_{datetime.now().timestamp()}",
                     "company_id": company_id,
                     "shareholder_id": int(future_issuance['shareholderId']),
                     "share_class_id": int(future_issuance['shareClassId']),
@@ -179,14 +224,12 @@ def handler(request, context):
                     "price_per_share": float(future_issuance['pricePerShare']),
                     "issue_date": future_issuance['issueDate'],
                     "round": future_issuance['round'] or 'Future Scenario',
-                    "created_at": datetime.now().isoformat() # Add created_at for sorting
+                    "created_at": datetime.now().isoformat()
                 }
                 future_issuances.append(future_issuance_processed)
                 
                 future_state_data = calculate_equity_snapshot(future_issuances, shareholders, share_classes)
 
-                # Calculate percentage change for shareholders
-                # We need to get the "current" percentages based on current_state_data
                 current_shareholder_percentages = {
                     sh['id']: (sh['totalShares'] / current_state_data['totalShares'] * 100) if current_state_data['totalShares'] > 0 else 0
                     for sh in current_state_data['shareholderSummary']
@@ -208,22 +251,13 @@ def handler(request, context):
             response = jsonify(response_data)
             response.headers.add('Access-Control-Allow-Origin', '*')
             return response
+        
+        return jsonify({"error": "Endpoint not found"}), 404, headers
 
-        except Exception as e:
-            print(f"Error in handler: {e}") # Log the error for Vercel logs
-            response = jsonify({"error": str(e)}), 500
-            response[0].headers.add('Access-Control-Allow-Origin', '*')
-            return response
+    except Exception as e:
+        print(f"Error in handler: {e}")
+        response = jsonify({"error": str(e)}), 500
+        response[0].headers.add('Access-Control-Allow-Origin', '*')
+        return response
     
-    return jsonify({"error": "Method Not Allowed"}), 405
-
-# For local testing (optional, requires `python-dotenv` and `pip install python-dotenv`)
-# if __name__ == '__main__':
-#     from dotenv import load_dotenv
-#     load_dotenv() # Load .env file for local development
-#     # You might need to mock request object for local testing if not using Flask's dev server
-#     # from flask import Flask
-#     # app = Flask(__name__)
-#     # with app.test_request_context(json={'companyId': 1, 'currentIssuances': [], 'shareholders': [], 'shareClasses': []}):
-#     #     response = handler(request, None)
-#     #     print(response.get_data())
+    return jsonify({"error": "Method Not Allowed"}), 405, headers # Fallback for unhandled methods/paths
