@@ -1,0 +1,3 @@
+supabase-py
+pandas
+Flask # Required for jsonify and request objects in Vercel's Python runtime
