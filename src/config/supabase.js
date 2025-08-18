@@ -4,8 +4,7 @@
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn3dmwrBqzR2s9dzCn6GxqslhlU7iiE";
 
-// This import is needed here because createClient is used in this file
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'; // This import is needed here
 
 let supabase = null;
 // Check if window.supabase exists (meaning the CDN script has loaded)
