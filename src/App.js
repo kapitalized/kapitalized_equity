@@ -55,6 +55,12 @@ const EquityManagementApp = () => {
   const [futureScenarioResults, setFutureScenarioResults] = useState(null);
   const [selectedRound, setSelectedRound] = useState('current');
 
+  // Sidebar state declarations (FIXED: moved here)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // My Account sub-tab state declaration (FIXED: moved here)
+  const [myAccountSubTab, setMyAccountSubTab] = useState('profile');
+
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
@@ -1372,7 +1378,7 @@ const EquityManagementApp = () => {
             <>
               {activeTab === 'dashboard' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2> {/* Page Title */}
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div className="bg-white p-6 rounded-lg shadow">
                       <h3 className="text-lg font-medium text-gray-900 mb-2">Total Shares Outstanding</h3>
@@ -1448,7 +1454,7 @@ const EquityManagementApp = () => {
 
               {activeTab === 'shareholders' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shareholders</h2> {/* Page Title */}
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shareholders</h2>
                   <div className="flex justify-between items-center">
                     <div className="flex space-x-2">
                       <button
@@ -1513,7 +1519,7 @@ const EquityManagementApp = () => {
 
               {activeTab === 'issuances' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Share Issuances</h2> {/* Page Title */}
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Share Issuances</h2>
                   <div className="flex justify-between items-center">
                     <h2 className="text-xl font-semibold text-gray-900">Share Issuances</h2>
                     <button
@@ -1574,7 +1580,7 @@ const EquityManagementApp = () => {
 
               {activeTab === 'bulk-add' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Bulk Add Shares</h2> {/* Page Title */}
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Bulk Add Shares</h2>
                   <div className="bg-white p-6 rounded-lg shadow">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Add Multiple Share Issuances</h3>
                     <p className="text-sm text-gray-600 mb-4">
@@ -1605,7 +1611,7 @@ const EquityManagementApp = () => {
 
               {activeTab === 'reports' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Reports & Scenarios</h2> {/* Page Title */}
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Reports & Scenarios</h2>
                   
                   <div className="bg-white p-6 rounded-lg shadow">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Current Equity Status</h3>
@@ -1840,7 +1846,7 @@ const EquityManagementApp = () => {
 
               {activeTab === 'account' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">My Account</h2> {/* Page Title */}
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">My Account</h2>
                   <div className="mb-6 border-b border-gray-200">
                     <nav className="-mb-px flex space-x-8">
                       <button
