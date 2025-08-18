@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'; // Added useRef for PDF capture
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown } from 'lucide-react'; // Added Download and ChevronDown icons
+import React, { useState, useEffect, useRef } from 'react';
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 import { supabase } from './config/supabase'; // IMPORTED FROM NEW FILE
@@ -11,37 +11,37 @@ const PYTHON_BACKEND_URL = "/api/equity-calculator";
 
 const EquityManagementApp = () => {
   // Refs for PDF capture
-  const dashboardRef = useRef(); // Ref for the entire dashboard content (for general layout)
-  const pieChartRef = useRef(); // Specific ref for the PieChart component
+  const dashboardRef = useRef();
+  const pieChartRef = useRef();
 
   // State management
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // Global loading state
+  const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [shareholders, setShareholders] = useState([]);
   const [shareClasses, setShareClasses] = useState([]);
   const [shareIssuances, setShareIssuances] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [errorMessage, setErrorMessage] = useState(''); // State for displaying error messages
-  const [signUpSuccessMessage, setSignUpSuccessMessage] = useState(''); // New state for sign-up success message
+  const [errorMessage, setErrorMessage] = useState('');
+  const [signUpSuccessMessage, setSignUpSuccessMessage] = useState('');
 
   // Form/Modal states
   const [showLogin, setShowLogin] = useState(true);
   const [showSignUp, setShowSignUp] = useState(false);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [signUpData, setSignUpData] = useState({ email: '', password: '', fullName: '', username: '' }); // Added username
-  const [userProfile, setUserProfile] = useState(null); // For user profile management
+  const [signUpData, setSignUpData] = useState({ email: '', password: '', fullName: '', username: '' });
+  const [userProfile, setUserProfile] = useState(null);
 
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showCreateShareholder, setShowCreateShareholder] = useState(false);
   const [showCreateShareClass, setShowCreateShareClass] = useState(false);
   const [showCreateIssuance, setShowCreateIssuance] = useState(false);
-  const [showBulkAddIssuance, setShowBulkAddIssuance] = useState(false); // New bulk add modal
-  const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false); // New bulk add shareholder modal
-  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false); // For delete account confirmation
-  const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false); // For deactivate account confirmation
-  const [showLoginDetailsDropdown, setShowLoginDetailsDropdown] = useState(false); // For login details dropdown
+  const [showBulkAddIssuance, setShowBulkAddIssuance] = useState(false);
+  const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false);
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
+  const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false);
+  const [showLoginDetailsDropdown, setShowLoginDetailsDropdown] = useState(false);
 
   // New states for Reports tab
   const [futureIssuanceData, setFutureIssuanceData] = useState({
@@ -53,21 +53,19 @@ const EquityManagementApp = () => {
     round: 'Future Scenario'
   });
   const [futureScenarioResults, setFutureScenarioResults] = useState(null);
-  const [selectedRound, setSelectedRound] = useState('current'); // 'current' or a specific round name
+  const [selectedRound, setSelectedRound] = useState('current');
 
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
   // --- Supabase Authentication ---
   useEffect(() => {
-    // Ensure supabase client is initialized before proceeding
     if (!supabase) {
       setLoading(false);
       setErrorMessage("Supabase client not initialized. Cannot proceed with authentication. Please check browser console for details.");
       return;
     }
 
-    // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user || null);
@@ -78,7 +76,6 @@ const EquityManagementApp = () => {
           fetchUserProfile(session.user.id);
         } else {
           setShowLogin(true);
-          // Clear all data on logout
           setCompanies([]);
           setSelectedCompany(null);
           setShareholders([]);
@@ -89,7 +86,6 @@ const EquityManagementApp = () => {
       }
     );
 
-    // Check current session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
       setLoading(false);
@@ -103,12 +99,12 @@ const EquityManagementApp = () => {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    setSignUpSuccessMessage(''); // Clear sign up success message on login attempt
+    setSignUpSuccessMessage('');
     setLoading(true);
     if (!supabase) {
       setErrorMessage("Supabase client not initialized.");
@@ -122,15 +118,13 @@ const EquityManagementApp = () => {
     setLoading(false);
     if (error) {
       setErrorMessage(error.message);
-    } else {
-      // User state will be updated by onAuthStateChange listener
     }
   };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    setSignUpSuccessMessage(''); // Clear previous messages
+    setSignUpSuccessMessage('');
     setLoading(true);
     if (!supabase) {
       setErrorMessage("Supabase client not initialized.");
@@ -138,13 +132,11 @@ const EquityManagementApp = () => {
       return;
     }
     try {
-      // Generate a random username if not provided
       const generatedUsername = signUpData.username || `user_${Math.random().toString(36).substring(2, 9)}`;
       
       const { data, error } = await supabase.auth.signUp({
         email: signUpData.email,
         password: signUpData.password,
-        // Pass full_name and username in raw_user_meta_data for the trigger to pick up
         options: {
           data: {
             full_name: signUpData.fullName,
@@ -159,12 +151,11 @@ const EquityManagementApp = () => {
       } else if (data.user) {
         setSignUpSuccessMessage('Sign up successful! Please check your email to confirm your account. You can now log in.');
         
-        // --- Create dummy data for the new user ---
         await createSampleDataForNewUser(data.user.id);
 
         setShowSignUp(false);
         setShowLogin(true);
-        setLoginData({ email: signUpData.email, password: '' }); // Clear password for security
+        setLoginData({ email: signUpData.email, password: '' });
       }
     } catch (error) {
       setErrorMessage('Sign up failed: ' + error.message);
@@ -187,17 +178,14 @@ const EquityManagementApp = () => {
     }
   };
 
-  // --- Data Fetching from Supabase ---
   const fetchInitialData = async (userId) => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
     try {
-      // Fetch companies owned by the current user
       const { data: companiesData, error: companiesError } = await supabase
         .from('companies')
         .select('*')
@@ -205,10 +193,8 @@ const EquityManagementApp = () => {
 
       if (companiesError) throw companiesError;
       setCompanies(companiesData);
-      // Automatically select the first company if available
       if (companiesData.length > 0) {
         setSelectedCompany(companiesData[0]);
-        // Also fetch related data for the first company
         fetchCompanyRelatedData(companiesData[0].id);
       } else {
         setSelectedCompany(null);
@@ -228,7 +214,6 @@ const EquityManagementApp = () => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -261,18 +246,15 @@ const EquityManagementApp = () => {
     }
   };
 
-  // Effect to re-fetch related data when selectedCompany changes
   useEffect(() => {
     if (selectedCompany) {
       fetchCompanyRelatedData(selectedCompany.id);
     }
   }, [selectedCompany]);
 
-  // --- User Profile Management ---
   const fetchUserProfile = async (userId) => {
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       return;
     }
     try {
@@ -280,9 +262,9 @@ const EquityManagementApp = () => {
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single(); // Use single to get one record
+        .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found (new user)
+      if (error && error.code !== 'PGRST116') {
         throw error;
       }
       setUserProfile(data);
@@ -300,12 +282,10 @@ const EquityManagementApp = () => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
     try {
-      // Check for unique username if it's being changed
       if (profileData.username && profileData.username !== userProfile?.username) {
         const { data: existingUser, error: checkError } = await supabase
           .from('user_profiles')
@@ -313,7 +293,7 @@ const EquityManagementApp = () => {
           .eq('username', profileData.username)
           .single();
         
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
+        if (checkError && checkError.code !== 'PGRST116') {
           throw checkError;
         }
         if (existingUser && existingUser.id !== user.id) {
@@ -323,19 +303,17 @@ const EquityManagementApp = () => {
         }
       }
 
-      // Ensure data sent matches database column names (snake_case)
       const dataToUpdate = {
-        full_name: profileData.fullName, // Convert from camelCase to snake_case
+        full_name: profileData.fullName,
         dob: profileData.dob,
         address: profileData.address,
-        username: profileData.username, // Include username
+        username: profileData.username,
       };
       const { data, error } = await supabase
         .from('user_profiles')
-        .upsert({ id: user.id, ...dataToUpdate }, { onConflict: 'id' }); // Use upsert to insert or update
+        .upsert({ id: user.id, ...dataToUpdate }, { onConflict: 'id' });
 
       if (error) throw error;
-      // Update local state with the data that was actually sent (snake_case for internal consistency)
       setUserProfile({ ...userProfile, ...dataToUpdate });
       alert('Profile updated successfully!');
     } catch (error) {
@@ -349,7 +327,6 @@ const EquityManagementApp = () => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -376,8 +353,6 @@ const EquityManagementApp = () => {
     }
 
     try {
-      // 1. Delete all companies owned by the user (this should cascade delete related data)
-      // This relies on the RLS DELETE policy for 'companies' being correctly set.
       const { error: deleteCompaniesError } = await supabase
         .from('companies')
         .delete()
@@ -386,21 +361,18 @@ const EquityManagementApp = () => {
       if (deleteCompaniesError) throw deleteCompaniesError;
       console.log('User companies and related data deleted.');
 
-      // 2. Delete user profile (if not already cascaded by auth.users deletion, which is not client-side possible)
       const { error: deleteProfileError } = await supabase
         .from('user_profiles')
         .delete()
         .eq('id', user.id);
 
       if (deleteProfileError) {
-        // Ignore PGRST116 (no rows found) if profile was already deleted by cascade from auth.users
         if (deleteProfileError.code !== 'PGRST116') {
           throw deleteProfileError;
         }
       }
       console.log('User profile deleted or not found (expected).');
 
-      // 3. Sign out the user
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
 
@@ -411,13 +383,8 @@ const EquityManagementApp = () => {
       setShareClasses([]);
       setShareIssuances([]);
       setUserProfile(null);
-      setUser(null); // Clear user state
-      setShowLogin(true); // Redirect to login page
-
-      // IMPORTANT NOTE: Deleting the user record from `auth.users` itself requires a Supabase Service Role Key,
-      // which should NEVER be exposed client-side. This client-side function deletes the user's data,
-      // but the core authentication record in `auth.users` remains. For full deletion,
-      // you would need a secure backend function (e.g., Supabase Edge Function) that uses the Service Role Key.
+      setUser(null);
+      setShowLogin(true);
 
     } catch (error) {
       setErrorMessage('Error deleting account: ' + error.message + '. Please ensure the DELETE RLS policy for companies is correctly set. Note: the core authentication record cannot be deleted from the client-side for security reasons.');
@@ -438,14 +405,10 @@ const EquityManagementApp = () => {
     try {
         const currentEmail = user.email;
         const timestamp = new Date().getTime();
-        // Generate a valid email alias: original_local_part+inactive-timestamp@domain.com
-        // This is a common and valid way to "deactivate" an email without changing the core user identity.
         const [localPart, domain] = currentEmail.split('@');
-        // Ensure the local part doesn't contain '+' already to avoid multiple '+inactive'
         const cleanLocalPart = localPart.split('+')[0];
         const newEmail = `${cleanLocalPart}+inactive-${timestamp}@${domain}`;
 
-        // 1. Update email in auth.users
         const { data: authUpdateData, error: authUpdateError } = await supabase.auth.updateUser({
             email: newEmail,
         });
@@ -453,7 +416,6 @@ const EquityManagementApp = () => {
         if (authUpdateError) throw authUpdateError;
         console.log('User email updated to inactive:', newEmail);
 
-        // 2. Update status in user_profiles table
         const { error: profileUpdateError } = await supabase
             .from('user_profiles')
             .update({ status: 'inactive' })
@@ -462,13 +424,12 @@ const EquityManagementApp = () => {
         if (profileUpdateError) throw profileUpdateError;
         console.log('User profile status set to inactive.');
 
-        // 3. Sign out the user
         const { error: signOutError } = await supabase.auth.signOut();
         if (signOutError) throw signOutError;
 
         alert('Your account has been deactivated and you have been logged out. You can now create a new account with your original email.');
-        setUser(null); // Clear user state
-        setShowLogin(true); // Redirect to login page
+        setUser(null);
+        setShowLogin(true);
 
     } catch (error) {
         setErrorMessage('Error deactivating account: ' + error.message);
@@ -479,14 +440,12 @@ const EquityManagementApp = () => {
 };
 
 
-  // --- Dummy Data Creation for New Users ---
   const createSampleDataForNewUser = async (userId) => {
     if (!supabase) {
       console.error("Supabase client not initialized for sample data creation.");
       return;
     }
     try {
-      // 1. Create Sample Company
       const { data: sampleCompany, error: companyError } = await supabase
         .from('companies')
         .insert({
@@ -500,12 +459,29 @@ const EquityManagementApp = () => {
       if (companyError) throw companyError;
       console.log('Sample company created:', sampleCompany.name);
 
-      // 2. Add Default Share Classes (already handled in createCompany, but ensuring here if needed elsewhere)
-      // For a new user, this will be handled when their first company is created.
-      // If this function is called independently, we might need to re-evaluate.
-      // For now, assuming createCompany handles initial share classes.
+      const defaultShareClasses = [
+        { name: 'Common', priority: 10, description: 'Standard common shares' },
+        { name: 'Preference Participating', priority: 1, description: 'Preferred shares with participation rights' },
+        { name: 'Preference Non-Participating', priority: 2, description: 'Preferred shares without participation rights' },
+        { name: 'Convertible', priority: 5, description: 'Shares convertible into common shares' },
+      ];
 
-      // 3. Create Sample Shareholders
+      const shareClassesToInsert = defaultShareClasses.map(sc => ({
+        ...sc,
+        company_id: sampleCompany.id
+      }));
+
+      const { error: shareClassError } = await supabase
+        .from('share_classes')
+        .insert(shareClassesToInsert);
+
+      if (shareClassError) {
+        console.error("Error inserting default share classes:", shareClassError.message);
+        setErrorMessage('Company created, but failed to add default share classes: ' + shareClassError.message);
+      } else {
+        fetchCompanyRelatedData(sampleCompany.id);
+      }
+
       const sampleShareholdersData = [
         { name: 'Alice Smith [Sample]', email: 'alice.sample@example.com', type: 'Founder' },
         { name: 'Bob Johnson [Sample]', email: 'bob.sample@example.com', type: 'Investor' },
@@ -525,17 +501,13 @@ const EquityManagementApp = () => {
       if (shareholdersError) throw shareholdersError;
       console.log('Sample shareholders created:', createdShareholders.map(s => s.name));
 
-      // 4. Create Sample Share Issuances
-      // Fetch default share classes for the new company to link issuances
-      const { data: defaultShareClasses, error: fetchClassesError } = await supabase
+      const { data: fetchedShareClasses } = await supabase
         .from('share_classes')
         .select('*')
         .eq('company_id', sampleCompany.id);
 
-      if (fetchClassesError) throw fetchClassesError;
-
-      const commonClass = defaultShareClasses.find(sc => sc.name === 'Common');
-      const prefPartClass = defaultShareClasses.find(sc => sc.name === 'Preference Participating');
+      const commonClass = fetchedShareClasses.find(sc => sc.name === 'Common');
+      const prefPartClass = fetchedShareClasses.find(sc => sc.name === 'Preference Participating');
 
       if (!commonClass || !prefPartClass) {
         console.warn('Could not find default share classes for sample issuances.');
@@ -544,7 +516,7 @@ const EquityManagementApp = () => {
 
       const sampleIssuancesData = [
         {
-          shareholder_id: createdShareholders[0].id, // Alice
+          shareholder_id: createdShareholders[0].id,
           share_class_id: commonClass.id,
           shares: 1000000,
           price_per_share: 0.01,
@@ -552,7 +524,7 @@ const EquityManagementApp = () => {
           round: 'Seed Round',
         },
         {
-          shareholder_id: createdShareholders[1].id, // Bob
+          shareholder_id: createdShareholders[1].id,
           share_class_id: prefPartClass.id,
           shares: 500000,
           price_per_share: 1.50,
@@ -560,7 +532,7 @@ const EquityManagementApp = () => {
           round: 'Series A',
         },
         {
-          shareholder_id: createdShareholders[2].id, // Charlie
+          shareholder_id: createdShareholders[2].id,
           share_class_id: commonClass.id,
           shares: 50000,
           price_per_share: 0.01,
@@ -588,13 +560,11 @@ const EquityManagementApp = () => {
   };
 
 
-  // --- CRUD Operations (integrated with Supabase) ---
   const createCompany = async (data) => {
     if (!user) return;
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -604,17 +574,16 @@ const EquityManagementApp = () => {
         .insert({
           name: data.name,
           description: data.description,
-          user_id: user.id, // Link to current user
+          user_id: user.id,
         })
-        .select() // Select the newly inserted row to get its ID and other fields
+        .select()
         .single();
 
       if (companyError) throw companyError;
       setCompanies([...companies, newCompany]);
-      setSelectedCompany(newCompany); // Select the new company
+      setSelectedCompany(newCompany);
       setShowCreateCompany(false);
 
-      // --- Add default share classes for the new company ---
       const defaultShareClasses = [
         { name: 'Common', priority: 10, description: 'Standard common shares' },
         { name: 'Preference Participating', priority: 1, description: 'Preferred shares with participation rights' },
@@ -624,7 +593,7 @@ const EquityManagementApp = () => {
 
       const shareClassesToInsert = defaultShareClasses.map(sc => ({
         ...sc,
-        company_id: newCompany.id // Associate with the newly created company
+        company_id: newCompany.id
       }));
 
       const { error: shareClassError } = await supabase
@@ -635,7 +604,6 @@ const EquityManagementApp = () => {
         console.error("Error inserting default share classes:", shareClassError.message);
         setErrorMessage('Company created, but failed to add default share classes: ' + shareClassError.message);
       } else {
-        // Re-fetch all share classes for the selected company to update state
         fetchCompanyRelatedData(newCompany.id);
       }
 
@@ -651,7 +619,6 @@ const EquityManagementApp = () => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -670,7 +637,7 @@ const EquityManagementApp = () => {
       if (error) throw error;
       setShareholders([...shareholders, newShareholder]);
       setShowCreateShareholder(false);
-      setShowBulkAddShareholder(false); // Close bulk add if opened from there
+      setShowBulkAddShareholder(false);
     } catch (error) {
       setErrorMessage('Error creating shareholder: ' + error.message);
     } finally {
@@ -683,7 +650,6 @@ const EquityManagementApp = () => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -714,7 +680,6 @@ const EquityManagementApp = () => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -728,7 +693,7 @@ const EquityManagementApp = () => {
           shares: parseInt(data.shares),
           price_per_share: parseFloat(data.pricePerShare),
           issue_date: data.issueDate,
-          round: data.round || null, // Add issuance round
+          round: data.round || null,
         })
         .select()
         .single();
@@ -736,7 +701,7 @@ const EquityManagementApp = () => {
       if (error) throw error;
       setShareIssuances([...shareIssuances, newIssuance]);
       setShowCreateIssuance(false);
-      setShowBulkAddIssuance(false); // Close bulk add if opened from there
+      setShowBulkAddIssuance(false);
     } catch (error) {
       setErrorMessage('Error creating issuance: ' + error.message);
     } finally {
@@ -748,7 +713,6 @@ const EquityManagementApp = () => {
     setLoading(true);
     setErrorMessage('');
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -767,7 +731,6 @@ const EquityManagementApp = () => {
     }
   };
 
-  // --- Data processing for Dashboard ---
   const getCompanyData = (issuancesToProcess = shareIssuances) => {
     if (!selectedCompany) return { totalShares: 0, totalValue: 0, classSummary: [], latestValuationPerShare: 0, companyValuation: 0 };
 
@@ -832,8 +795,8 @@ const EquityManagementApp = () => {
           holdings: issuances.map(i => ({
             ...i,
             shareClassName: shareClasses.find(sc => sc.id === i.share_class_id)?.name || 'Unknown',
-            valuation: i.shares * i.price_per_share, // Valuation per individual issuance
-            round: i.round, // Include round in holdings
+            valuation: i.shares * i.price_per_share,
+            round: i.round,
           }))
         };
       })
@@ -841,7 +804,6 @@ const EquityManagementApp = () => {
       .value();
   };
 
-  // --- Calculations via Python Backend ---
   const fetchEquityCalculations = async (futureIssuance = null) => {
     if (!selectedCompany || !PYTHON_BACKEND_URL) {
       setErrorMessage("Company not selected or Python backend URL not configured.");
@@ -851,13 +813,12 @@ const EquityManagementApp = () => {
     setErrorMessage('');
 
     try {
-      // Pass all necessary current data to the backend for calculation
       const payload = {
         companyId: selectedCompany.id,
-        currentIssuances: shareIssuances, // Pass current issuances
-        shareholders: shareholders, // Pass current shareholders
-        shareClasses: shareClasses, // Pass current share classes
-        futureIssuance: futureIssuance // Pass future issuance if it's a scenario calculation
+        currentIssuances: shareIssuances,
+        shareholders: shareholders,
+        shareClasses: shareClasses,
+        futureIssuance: futureIssuance
       };
 
       const response = await fetch(PYTHON_BACKEND_URL, {
@@ -885,7 +846,6 @@ const EquityManagementApp = () => {
     }
   };
 
-  // --- Handle Future Scenario Calculation ---
   const handleCalculateFutureScenario = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -895,7 +855,6 @@ const EquityManagementApp = () => {
     }
   };
 
-  // --- Get data for specific round (or current) ---
   const getEquityDataForRound = (roundName) => {
     if (roundName === 'current') {
       return {
@@ -903,7 +862,6 @@ const EquityManagementApp = () => {
         shareholderData: getShareholderData(shareIssuances)
       };
     } else {
-      // Filter issuances by the selected round name
       const issuancesForRound = shareIssuances.filter(issuance => issuance.round === roundName);
       return {
         companyData: getCompanyData(issuancesForRound),
@@ -915,37 +873,32 @@ const EquityManagementApp = () => {
   const currentEquityData = getEquityDataForRound('current');
   const displayEquityData = selectedRound === 'current' ? currentEquityData : getEquityDataForRound(selectedRound);
 
-  // Get unique rounds for the dropdown
   const uniqueRounds = _.chain(shareIssuances)
     .map('round')
-    .compact() // Remove null/undefined rounds
+    .compact()
     .uniq()
     .value();
 
 
-  // --- CSV Upload handler (simplified, needs robust parsing for production) ---
   const handleCsvUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const text = e.target.result;
-        const lines = text.split('\n').slice(1); // Skip header
+        const lines = text.split('\n').slice(1);
 
         for (const line of lines) {
           const [shareholderName, shareClassName, shares, pricePerShare, issueDate, round] = line.split(',').map(s => s.trim());
           if (shareholderName && shares) {
-            // Basic validation/lookup
             let shareholder = shareholders.find(s => s.name === shareholderName);
             if (!shareholder) {
-              // Optionally create shareholder if not found, or log error
               console.warn(`Shareholder "${shareholderName}" not found. Skipping issuance.`);
               continue;
             }
 
             let shareClass = shareClasses.find(sc => sc.name === shareClassName);
             if (!shareClass) {
-              // Optionally create share class if not found, or log error
               console.warn(`Share class "${shareClassName}" not found. Skipping issuance.`);
               continue;
               }
@@ -958,7 +911,7 @@ const EquityManagementApp = () => {
               issueDate: issueDate || new Date().toISOString().split('T')[0],
               round: round || null,
             };
-            await createIssuance(issuance); // Create one by one
+            await createIssuance(issuance);
           }
         }
         alert('CSV upload processing complete. Check issuances tab.');
@@ -967,7 +920,6 @@ const EquityManagementApp = () => {
     }
   };
 
-  // --- PDF Download Function ---
   const handleDownloadPdf = async () => {
     if (!selectedCompany || !window.jspdf) {
       setErrorMessage("Cannot generate PDF. Ensure a company is selected and jsPDF library is loaded.");
@@ -979,9 +931,8 @@ const EquityManagementApp = () => {
 
     try {
       const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
-      let y = 10; // Initial Y position
+      let y = 10;
 
-      // Company Details
       pdf.setFontSize(18);
       pdf.text(`${selectedCompany.name} - Company Equity Profile`, 10, y);
       y += 10;
@@ -991,7 +942,6 @@ const EquityManagementApp = () => {
       pdf.text(`Generated On: ${new Date().toLocaleDateString()}`, 10, y);
       y += 15;
 
-      // Summary Cards Data
       pdf.setFontSize(14);
       pdf.text('Company Overview', 10, y);
       y += 7;
@@ -1005,17 +955,16 @@ const EquityManagementApp = () => {
       pdf.text(`Company Valuation (Total Shares x Latest Price): $${companyData.companyValuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 10, y);
       y += 15;
 
-      // Pie Chart (captured as image)
       if (pieChartRef.current && window.html2canvas) {
         pdf.setFontSize(14);
         pdf.text('Share Distribution by Class', 10, y);
         y += 5;
         const pieCanvas = await window.html2canvas(pieChartRef.current, { scale: 2, useCORS: true });
         const pieImgData = pieCanvas.toDataURL('image/png');
-        const pieImgWidth = 100; // Adjust as needed
+        const pieImgWidth = 100;
         const pieImgHeight = pieCanvas.height * pieImgWidth / pieCanvas.width;
 
-        if (y + pieImgHeight > pdf.internal.pageSize.height - 20) { // Check if new page is needed
+        if (y + pieImgHeight > pdf.internal.pageSize.height - 20) {
           pdf.addPage();
           y = 10;
         }
@@ -1023,7 +972,6 @@ const EquityManagementApp = () => {
         y += pieImgHeight + 15;
       }
 
-      // Share Classes Table
       pdf.setFontSize(14);
       pdf.text('Share Classes Summary', 10, y);
       y += 7;
@@ -1043,12 +991,11 @@ const EquityManagementApp = () => {
         styles: { fontSize: 10, cellPadding: 2, overflow: 'linebreak' },
         margin: { left: 10, right: 10 },
         didDrawPage: function (data) {
-          y = data.cursor.y; // Update y position after table
+          y = data.cursor.y;
         }
       });
       y = pdf.autoTable.previous.finalY + 15;
 
-      // Shareholders Table
       pdf.setFontSize(14);
       pdf.text('Shareholders Details', 10, y);
       y += 7;
@@ -1067,15 +1014,14 @@ const EquityManagementApp = () => {
         theme: 'grid',
         headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
         styles: { fontSize: 10, cellPadding: 2, overflow: 'linebreak' },
-        columnStyles: { 5: { cellWidth: 60 } }, // Adjust width for holdings column
+        columnStyles: { 5: { cellWidth: 60 } },
         margin: { left: 10, right: 10 },
         didDrawPage: function (data) {
-          y = data.cursor.y; // Update y position after table
+          y = data.cursor.y;
         }
       });
       y = pdf.autoTable.previous.finalY + 15;
 
-      // Share Issuances Table
       pdf.setFontSize(14);
       pdf.text('Share Issuances Log', 10, y);
       y += 7;
@@ -1103,7 +1049,7 @@ const EquityManagementApp = () => {
         styles: { fontSize: 10, cellPadding: 2, overflow: 'linebreak' },
         margin: { left: 10, right: 10 },
         didDrawPage: function (data) {
-          y = data.cursor.y; // Update y position after table
+          y = data.cursor.y;
         }
       });
 
@@ -1118,7 +1064,6 @@ const EquityManagementApp = () => {
     }
   };
 
-  // --- CSV Download Function ---
   const handleDownloadCsv = () => {
     if (!selectedCompany || shareholderData.length === 0) {
       setErrorMessage("No shareholder data to download for CSV.");
@@ -1129,18 +1074,16 @@ const EquityManagementApp = () => {
     setErrorMessage('');
 
     try {
-      // CSV Header
       const headers = ["Name", "Email", "Type", "Total Shares", "Total Value", "Holdings Details"];
       let csvContent = headers.join(",") + "\n";
 
-      // CSV Rows
       shareholderData.forEach(sh => {
         const holdingsString = sh.holdings.map(h =>
           `${h.shareClassName}: ${h.shares} @ $${h.price_per_share} (Round: ${h.round || 'N/A'}) - Value: $${h.valuation}`
-        ).join('; '); // Use semicolon to separate multiple holdings within one cell
+        ).join('; ');
 
         const row = [
-          `"${sh.name}"`, // Wrap in quotes to handle commas in names
+          `"${sh.name}"`,
           `"${sh.email}"`,
           `"${sh.type}"`,
           sh.totalShares,
@@ -1152,7 +1095,7 @@ const EquityManagementApp = () => {
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
-      if (link.download !== undefined) { // Feature detection for download attribute
+      if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
         link.setAttribute('download', `${selectedCompany.name}_Shareholders.csv`);
@@ -1253,7 +1196,7 @@ const EquityManagementApp = () => {
               </div>
               <div className="mb-4">
                 <input
-                  type="text" // Changed to text for username
+                  type="text"
                   placeholder="Username (optional, auto-generated if empty)"
                   value={signUpData.username}
                   onChange={(e) => setSignUpData({...signUpData, username: e.target.value})}
@@ -1303,182 +1246,262 @@ const EquityManagementApp = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <Building2 className="h-8 w-8 text-blue-600 mr-2" />
-              <h1 className="text-xl font-semibold text-gray-900">Equity Management</h1>
-              {selectedCompany && (
-                <span className="ml-4 text-sm text-gray-500">• {selectedCompany.name}</span>
-              )}
-            </div>
-            {/* My Account Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)}
-                className="flex items-center text-sm text-gray-600 hover:text-gray-800 focus:outline-none"
-              >
-                <User className="h-5 w-5 mr-1" />
-                {userProfile?.username || user?.email || 'My Account'} <ChevronDown className="ml-1 h-4 w-4" />
-              </button>
-              {showLoginDetailsDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                  <button
-                    onClick={() => { setActiveTab('account'); setShowLoginDetailsDropdown(false); }}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                  >
-                    My Account
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {errorMessage && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <span className="block sm:inline">{errorMessage}</span>
-            <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setErrorMessage('')}>
-              <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
-            </span>
-          </div>
-        )}
-
-        {/* Company Selection */}
-        <div className="mb-6 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <select
-              value={selectedCompany?.id || ''}
-              onChange={(e) => {
-                const company = companies.find(c => c.id == e.target.value);
-                setSelectedCompany(company);
-              }}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select Company</option>
-              {companies.map(company => (
-                <option key={company.id} value={company.id}>{company.name}</option>
-              ))}
-            </select>
-          </div>
+    <div className="min-h-screen bg-gray-50 flex"> {/* Changed to flex for sidebar layout */}
+      {/* Sidebar */}
+      <div className={`bg-white shadow-md transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-64'} h-screen flex flex-col`}>
+        <div className="flex items-center justify-between p-4 border-b">
+          {!isSidebarCollapsed && (
+            <h2 className="text-xl font-semibold text-gray-900 truncate">Kapitalized</h2>
+          )}
           <button
-            onClick={() => setShowCreateCompany(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="p-2 rounded-md hover:bg-gray-100 focus:outline-none"
           >
-            <PlusCircle className="h-4 w-4 mr-2" />
-            New Company
+            {isSidebarCollapsed ? <ChevronRight className="h-6 w-6" /> : <ChevronLeft className="h-6 w-6" />}
           </button>
         </div>
+        <nav className="flex-1 px-2 py-4 space-y-2">
+          {[
+            { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
+            { id: 'shareholders', name: 'Shareholders', icon: Users },
+            { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
+            { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload },
+            { id: 'reports', name: 'Reports', icon: Download }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${
+                activeTab === tab.id
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <tab.icon className={`h-5 w-5 ${!isSidebarCollapsed && 'mr-3'}`} />
+              {!isSidebarCollapsed && tab.name}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-        {selectedCompany && (
-          <>
-            {/* Navigation Tabs */}
-            <div className="mb-6 border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8">
-                {[
-                  { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
-                  { id: 'shareholders', name: 'Shareholders', icon: Users },
-                  { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
-                  { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload },
-                  { id: 'reports', name: 'Reports', icon: Download } // New Reports Tab
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <tab.icon className="h-4 w-4 mr-2" />
-                    {tab.name}
-                  </button>
-                ))}
-              </nav>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header for Main Content */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center">
+                {selectedCompany && (
+                  <h1 className="text-xl font-semibold text-gray-900">{selectedCompany.name}</h1>
+                )}
+              </div>
+              {/* User Account Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)}
+                  className="flex items-center text-sm text-gray-600 hover:text-gray-800 focus:outline-none"
+                >
+                  <User className="h-5 w-5 mr-1" />
+                  {userProfile?.username || user?.email || 'My Account'} <ChevronDown className="ml-1 h-4 w-4" />
+                </button>
+                {showLoginDetailsDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                    <button
+                      onClick={() => { setActiveTab('account'); setMyAccountSubTab('profile'); setShowLoginDetailsDropdown(false); }}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('account'); setMyAccountSubTab('loginDetails'); setShowLoginDetailsDropdown(false); }}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      Login Details
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Dashboard Tab */}
-            {activeTab === 'dashboard' && (
-              <div className="space-y-6" ref={dashboardRef}> {/* Ref for PDF capture */}
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6"> {/* Changed to 4 columns */}
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Total Shares Outstanding</h3>
-                    <p className="text-3xl font-bold text-blue-600">{companyData.totalShares.toLocaleString()}</p>
+        {/* Main Content Body */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {errorMessage && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <span className="block sm:inline">{errorMessage}</span>
+              <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setErrorMessage('')}>
+                <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+              </span>
+            </div>
+          )}
+
+          {/* Company Selection - remains at the top of the main content */}
+          <div className="mb-6 flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <select
+                value={selectedCompany?.id || ''}
+                onChange={(e) => {
+                  const company = companies.find(c => c.id == e.target.value);
+                  setSelectedCompany(company);
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Company</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>{company.name}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setShowCreateCompany(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              New Company
+            </button>
+          </div>
+
+          {selectedCompany && (
+            <>
+              {activeTab === 'dashboard' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2> {/* Page Title */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Total Shares Outstanding</h3>
+                      <p className="text-3xl font-bold text-blue-600">{companyData.totalShares.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Total Equity Value (Sum of issuances)</h3>
+                      <p className="text-3xl font-bold text-green-600">${companyData.totalValue.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Latest Valuation per Share</h3>
+                      <p className="text-3xl font-bold text-purple-600">${companyData.latestValuationPerShare.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Company Valuation (Total Shares x Latest Price)</h3>
+                      <p className="text-3xl font-bold text-yellow-600">${companyData.companyValuation.toLocaleString()}</p>
+                    </div>
                   </div>
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Total Equity Value (Sum of issuances)</h3>
-                    <p className="text-3xl font-bold text-green-600">${companyData.totalValue.toLocaleString()}</p>
-                  </div>
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Latest Valuation per Share</h3>
-                    <p className="text-3xl font-bold text-purple-600">${companyData.latestValuationPerShare.toFixed(2)}</p>
-                  </div>
-                   <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Company Valuation (Total Shares x Latest Price)</h3>
-                    <p className="text-3xl font-bold text-yellow-600">${companyData.companyValuation.toLocaleString()}</p>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white p-6 rounded-lg shadow" ref={pieChartRef}>
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Share Distribution by Class</h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={companyData.classSummary}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            dataKey="totalShares"
+                            label={({name, percentage}) => `${name}: ${percentage}%`}
+                            isAnimationActive={false}
+                          >
+                            {companyData.classSummary.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="lg:text-lg font-medium text-gray-900 mb-4">Share Classes (by Priority)</h3>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">%</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {companyData.classSummary.map((item, index) => (
+                              <tr key={item.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.totalShares.toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.percentage}%</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.round}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                {/* Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Share Class Distribution */}
-                  <div className="bg-white p-6 rounded-lg shadow" ref={pieChartRef}> {/* Specific ref for pie chart */}
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Share Distribution by Class</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={companyData.classSummary}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          dataKey="totalShares"
-                          label={({name, percentage}) => `${name}: ${percentage}%`}
-                          isAnimationActive={false} // Disable animation for responsiveness
-                        >
-                          {companyData.classSummary.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+              {activeTab === 'shareholders' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shareholders</h2> {/* Page Title */}
+                  <div className="flex justify-between items-center">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setShowCreateShareClass(true)}
+                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        New Share Class
+                      </button>
+                      <button
+                        onClick={() => setShowBulkAddShareholder(true)}
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Bulk Add Shareholders
+                      </button>
+                      <button
+                        onClick={() => setShowCreateShareholder(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        New Shareholder
+                      </button>
+                    </div>
                   </div>
-                  {/* Share Class Summary Table */}
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="lg:text-lg font-medium text-gray-900 mb-4">Share Classes (by Priority)</h3>
+                  <div className="bg-white shadow rounded-lg">
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">%</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th> {/* New column */}
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Shares</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Holdings Details</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {companyData.classSummary.map((item, index) => (
-                            <tr key={item.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.totalShares.toLocaleString()}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.percentage}%</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.round}</td> {/* Display round */}
+                          {shareholderData.map(shareholder => (
+                            <tr key={shareholder.id}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.email}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.type}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.totalShares.toLocaleString()}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${shareholder.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">
+                                {shareholder.holdings.map((holding, idx) => (
+                                  <div key={idx} className="mb-1">
+                                    {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                  </div>
+                                ))}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1486,450 +1509,387 @@ const EquityManagementApp = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Shareholders Tab */}
-            {activeTab === 'shareholders' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-gray-900">Shareholders</h2>
-                  <div className="flex space-x-2">
+              {activeTab === 'issuances' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Share Issuances</h2> {/* Page Title */}
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900">Share Issuances</h2>
                     <button
-                      onClick={() => setShowCreateShareClass(true)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
-                    >
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      New Share Class
-                    </button>
-                    <button
-                      onClick={() => setShowBulkAddShareholder(true)} // Button to open bulk add modal
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center"
-                    >
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Bulk Add Shareholders
-                    </button>
-                    <button
-                      onClick={() => setShowCreateShareholder(true)}
+                      onClick={() => setShowCreateIssuance(true)}
                       className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
-                      New Shareholder
+                      New Issuance
                     </button>
                   </div>
-                </div>
-                {/* Shareholders Table */}
-                <div className="bg-white shadow rounded-lg">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Shares</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Holdings Details</th> {/* New column */}
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {shareholderData.map(shareholder => (
-                          <tr key={shareholder.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder.name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.email}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.type}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.totalShares.toLocaleString()}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${shareholder.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                             <td className="px-6 py-4 text-sm text-gray-500">
-                              {shareholder.holdings.map((holding, idx) => (
-                                <div key={idx} className="mb-1">
-                                  {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                </div>
-                              ))}
-                            </td>
+                  <div className="bg-white shadow rounded-lg">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shareholder</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Share Class</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price/Share</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {shareIssuances
+                            .filter(issuance => issuance.company_id === selectedCompany.id)
+                            .map(issuance => {
+                              const shareholder = shareholders.find(s => s.id === issuance.shareholder_id);
+                              const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
+                              return (
+                                <tr key={issuance.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.issue_date}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.round || 'N/A'}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder?.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareClass?.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.shares.toLocaleString()}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${issuance.price_per_share.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <button
+                                      onClick={() => deleteIssuance(issuance.id)}
+                                      className="text-red-600 hover:text-red-800"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Issuances Tab */}
-            {activeTab === 'issuances' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-gray-900">Share Issuances</h2>
-                  <button
-                    onClick={() => setShowCreateIssuance(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
-                  >
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    New Issuance
-                  </button>
-                </div>
-                {/* Issuances Table */}
-                <div className="bg-white shadow rounded-lg">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th> {/* New column */}
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shareholder</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Share Class</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price/Share</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {shareIssuances
-                          .filter(issuance => issuance.company_id === selectedCompany.id)
-                          .map(issuance => {
-                            const shareholder = shareholders.find(s => s.id === issuance.shareholder_id);
-                            const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
-                            return (
-                              <tr key={issuance.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.issue_date}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.round || 'N/A'}</td> {/* Display round */}
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder?.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareClass?.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.shares.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${issuance.price_per_share.toFixed(2)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  <button
-                                    onClick={() => deleteIssuance(issuance.id)}
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
+              {activeTab === 'bulk-add' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Bulk Add Shares</h2> {/* Page Title */}
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Add Multiple Share Issuances</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Manually add multiple rows of share issuances. Select a shareholder and then add their shares.
+                    </p>
+                    <BulkIssuanceForm
+                      shareholders={shareholders.filter(s => s.company_id === selectedCompany?.id)}
+                      shareClasses={shareClasses.filter(sc => sc.company_id === selectedCompany?.id)}
+                      onSubmit={createIssuance}
+                      errorMessage={errorMessage}
+                      setErrorMessage={setErrorMessage}
+                    />
+                  </div>
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Upload CSV File (Advanced)</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      CSV format: <code className="font-mono">shareholderName, shareClassName, shares, pricePerShare, issueDate, round</code>
+                    </p>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCsvUpload}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Bulk Add Shares Tab */}
-            {activeTab === 'bulk-add' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-gray-900">Bulk Add Shares</h2>
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Add Multiple Share Issuances</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Manually add multiple rows of share issuances. Select a shareholder and then add their shares.
-                  </p>
-                  <BulkIssuanceForm
-                    shareholders={shareholders.filter(s => s.company_id === selectedCompany?.id)}
-                    shareClasses={shareClasses.filter(sc => sc.company_id === selectedCompany?.id)}
-                    onSubmit={createIssuance}
-                    errorMessage={errorMessage}
-                    setErrorMessage={setErrorMessage}
-                  />
-                </div>
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Upload CSV File (Advanced)</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    CSV format: <code className="font-mono">shareholderName, shareClassName, shares, pricePerShare, issueDate, round</code>
-                  </p>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleCsvUpload}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Reports Tab */}
-            {activeTab === 'reports' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-gray-900">Reports & Scenarios</h2>
-                
-                {/* Current Status */}
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Current Equity Status</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    View the current equity distribution and valuation.
-                  </p>
-                  <button
-                    onClick={() => setSelectedRound('current')}
-                    className={`px-4 py-2 rounded-md flex items-center ${selectedRound === 'current' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                  >
-                    Show Current Status
-                  </button>
-                  {selectedRound === 'current' && (
-                    <div className="mt-4">
-                      {/* Display current status data */}
-                      <h4 className="font-semibold text-gray-800 mt-2">Current Company Overview:</h4>
-                      <p>Total Shares: {currentEquityData.companyData.totalShares.toLocaleString()}</p>
-                      <p>Total Value: ${currentEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                      <h4 className="font-semibold text-gray-800 mt-2">Current Shareholder Holdings:</h4>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {currentEquityData.shareholderData.map(sh => (
-                              <tr key={sh.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {((sh.totalShares / currentEquityData.companyData.totalShares) * 100).toFixed(2)}%
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Past Rounds */}
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Historical Rounds Analysis</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Analyze equity distribution and valuation at specific past issuance rounds.
-                  </p>
-                  <select
-                    value={selectedRound}
-                    onChange={(e) => setSelectedRound(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-                  >
-                    <option value="current">Select a Round...</option>
-                    {uniqueRounds.map(round => (
-                      <option key={round} value={round}>{round}</option>
-                    ))}
-                  </select>
-                  {selectedRound !== 'current' && selectedRound !== '' && (
-                    <div className="mt-4">
-                      <h4 className="font-semibold text-gray-800 mt-2">Equity Status at {selectedRound}:</h4>
-                      <p>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
-                      <p>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                      <h4 className="font-semibold text-gray-800 mt-2">Shareholder Holdings at {selectedRound}:</h4>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {displayEquityData.shareholderData.map(sh => (
-                              <tr key={sh.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {((sh.totalShares / displayEquityData.companyData.totalShares) * 100).toFixed(2)}%
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Future Scenario */}
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Future Scenario Planning</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Input a hypothetical future issuance to see its impact on current equity distribution.
-                  </p>
-                  <form onSubmit={handleCalculateFutureScenario} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder for Future Issuance</label>
-                      <select
-                        value={futureIssuanceData.shareholderId}
-                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareholderId: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      >
-                        <option value="">Select Shareholder</option>
-                        {shareholders.map(sh => (
-                          <option key={sh.id} value={sh.id}>{sh.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Share Class for Future Issuance</label>
-                      <select
-                        value={futureIssuanceData.shareClassId}
-                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareClassId: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      >
-                        <option value="">Select Share Class</option>
-                        {shareClasses.map(sc => (
-                          <option key={sc.id} value={sc.id}>{sc.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Shares (Future Issuance)</label>
-                      <input
-                        type="number"
-                        value={futureIssuanceData.shares}
-                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shares: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="1"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-sm text-gray-700 mb-1">Price per Share ($) (Future Issuance)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={futureIssuanceData.pricePerShare}
-                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, pricePerShare: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="0"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date (Future Issuance)</label>
-                      <input
-                        type="date"
-                        value={futureIssuanceData.issueDate}
-                        onChange={(e) => setFutureIssuanceData({...futureIssuanceData, issueDate: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
+              {activeTab === 'reports' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Reports & Scenarios</h2> {/* Page Title */}
+                  
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Current Equity Status</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      View the current equity distribution and valuation.
+                    </p>
                     <button
-                      type="submit"
+                      onClick={() => setSelectedRound('current')}
+                      className={`px-4 py-2 rounded-md flex items-center ${selectedRound === 'current' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                    >
+                      Show Current Status
+                    </button>
+                    {selectedRound === 'current' && (
+                      <div className="mt-4">
+                        <h4 className="font-semibold text-gray-800 mt-2">Current Company Overview:</h4>
+                        <p>Total Shares: {currentEquityData.companyData.totalShares.toLocaleString()}</p>
+                        <p>Total Value: ${currentEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <h4 className="font-semibold text-gray-800 mt-2">Current Shareholder Holdings:</h4>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {currentEquityData.shareholderData.map(sh => (
+                                <tr key={sh.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {((sh.totalShares / currentEquityData.companyData.totalShares) * 100).toFixed(2)}%
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Historical Rounds Analysis</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Analyze equity distribution and valuation at specific past issuance rounds.
+                    </p>
+                    <select
+                      value={selectedRound}
+                      onChange={(e) => setSelectedRound(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                    >
+                      <option value="current">Select a Round...</option>
+                      {uniqueRounds.map(round => (
+                        <option key={round} value={round}>{round}</option>
+                      ))}
+                    </select>
+                    {selectedRound !== 'current' && selectedRound !== '' && (
+                      <div className="mt-4">
+                        <h4 className="font-semibold text-gray-800 mt-2">Equity Status at {selectedRound}:</h4>
+                        <p>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
+                        <p>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <h4 className="font-semibold text-gray-800 mt-2">Shareholder Holdings at {selectedRound}:</h4>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {displayEquityData.shareholderData.map(sh => (
+                                <tr key={sh.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {((sh.totalShares / displayEquityData.companyData.totalShares) * 100).toFixed(2)}%
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Future Scenario Planning</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Input a hypothetical future issuance to see its impact on current equity distribution.
+                    </p>
+                    <form onSubmit={handleCalculateFutureScenario} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder for Future Issuance</label>
+                        <select
+                          value={futureIssuanceData.shareholderId}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareholderId: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        >
+                          <option value="">Select Shareholder</option>
+                          {shareholders.map(sh => (
+                            <option key={sh.id} value={sh.id}>{sh.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Share Class for Future Issuance</label>
+                        <select
+                          value={futureIssuanceData.shareClassId}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareClassId: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        >
+                          <option value="">Select Share Class</option>
+                          {shareClasses.map(sc => (
+                            <option key={sc.id} value={sc.id}>{sc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Shares (Future Issuance)</label>
+                        <input
+                          type="number"
+                          value={futureIssuanceData.shares}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shares: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          min="1"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-sm text-gray-700 mb-1">Price per Share ($) (Future Issuance)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={futureIssuanceData.pricePerShare}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, pricePerShare: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date (Future Issuance)</label>
+                        <input
+                          type="date"
+                          value={futureIssuanceData.issueDate}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, issueDate: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
+                        disabled={loading}
+                      >
+                        {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Calculate Future Scenario
+                      </button>
+                    </form>
+                    {futureScenarioResults && (
+                      <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-3">Future Scenario Results:</h4>
+                        <p>Total Shares (Future): {futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
+                        <p>Total Value (Future): ${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <h5 className="font-semibold text-gray-800 mt-3">Shareholder Impact:</h5>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current %</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Future %</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Change</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {futureScenarioResults.future_state.shareholderSummary.map(sh => (
+                                <tr key={sh.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.currentPercentage.toFixed(2)}%</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.futurePercentage.toFixed(2)}%</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.percentageChange.toFixed(2)}%</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Company Profile Report (PDF)</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
+                    </p>
+                    <button
+                      onClick={handleDownloadPdf}
                       className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
-                      disabled={loading}
                     >
-                      {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Calculate Future Scenario
-                    </button>
-                  </form>
-                  {futureScenarioResults && (
-                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">Future Scenario Results:</h4>
-                      <p>Total Shares (Future): {futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
-                      <p>Total Value (Future): ${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                      <h5 className="font-semibold text-gray-800 mt-3">Shareholder Impact:</h5>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current %</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Future %</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Change</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {futureScenarioResults.future_state.shareholderSummary.map(sh => (
-                              <tr key={sh.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.currentPercentage.toFixed(2)}%</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.futurePercentage.toFixed(2)}%</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.percentageChange.toFixed(2)}%</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Company Profile Report (PDF)</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
-                  </p>
-                  <button
-                    onClick={handleDownloadPdf}
-                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Company Profile PDF
-                  </button>
-                </div>
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Shareholders Data (CSV)</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Download a CSV file containing all shareholder details for the selected company.
-                  </p>
-                  <button
-                    onClick={handleDownloadCsv}
-                    className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700 flex items-center"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Shareholders CSV
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* My Account Tab (now accessed via dropdown) */}
-            {activeTab === 'account' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold text-gray-900">My Account</h2>
-                <UserProfileForm
-                  userProfile={userProfile}
-                  onSubmit={updateUserProfile}
-                  onPasswordChange={updatePassword}
-                  errorMessage={errorMessage}
-                  setErrorMessage={setErrorMessage}
-                />
-                <div className="bg-white p-6 rounded-lg shadow">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Account Management</h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Deactivate your account to free up your email for new sign-ups, or permanently delete your account and all associated company data.
-                  </p>
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={() => setShowConfirmDeactivateModal(true)}
-                      className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 flex items-center"
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      Deactivate Account
-                    </button>
-                    <button
-                      onClick={() => setShowConfirmDeleteModal(true)}
-                      className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete My Account
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Company Profile PDF
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    *Note: Deactivating changes your email and status. Deleting removes your data. The core authentication record in Supabase `auth.users` cannot be deleted directly from the client-side for security reasons.
-                  </p>
+                  <div className="bg-white p-6 rounded-lg shadow">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Shareholders Data (CSV)</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Download a CSV file containing all shareholder details for the selected company.
+                    </p>
+                    <button
+                      onClick={handleDownloadCsv}
+                      className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700 flex items-center"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Shareholders CSV
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+
+              {activeTab === 'account' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">My Account</h2> {/* Page Title */}
+                  <div className="mb-6 border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-8">
+                      <button
+                        onClick={() => setMyAccountSubTab('profile')}
+                        className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
+                          myAccountSubTab === 'profile'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Profile
+                      </button>
+                      <button
+                        onClick={() => setMyAccountSubTab('loginDetails')}
+                        className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
+                          myAccountSubTab === 'loginDetails'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Login Details
+                      </button>
+                    </nav>
+                  </div>
+
+                  {myAccountSubTab === 'profile' && (
+                    <UserProfileForm
+                      userProfile={userProfile}
+                      onSubmit={updateUserProfile}
+                      errorMessage={errorMessage}
+                      setErrorMessage={setErrorMessage}
+                    />
+                  )}
+
+                  {myAccountSubTab === 'loginDetails' && (
+                    <LoginDetailsForm
+                      userEmail={user?.email}
+                      onPasswordChange={updatePassword}
+                      onDeactivateAccount={() => setShowConfirmDeactivateModal(true)}
+                      onDeleteAccount={() => setShowConfirmDeleteModal(true)}
+                      errorMessage={errorMessage}
+                      setErrorMessage={setErrorMessage}
+                    />
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Modals */}
@@ -1981,7 +1941,6 @@ const EquityManagementApp = () => {
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
                 Cancel
-
               </button>
               <button
                 type="button"
@@ -2224,7 +2183,7 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
     shares: initialData.shares || '',
     pricePerShare: initialData.price_per_share || '',
     issueDate: new Date().toISOString().split('T')[0],
-    round: initialData.round || '', // New field for issuance round
+    round: initialData.round || '',
   });
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -2358,7 +2317,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
         break;
       }
       try {
-        await onSubmit(issuance); // Call the parent's createIssuance
+        await onSubmit(issuance);
       } catch (error) {
         setErrorMessage(`Error adding one or more issuances: ${error.message}`);
         allSuccessful = false;
@@ -2367,7 +2326,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
     }
     if (allSuccessful) {
       alert('All issuances added successfully!');
-      setIssuances([{ shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '' }]); // Reset form
+      setIssuances([{ shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '' }]);
     }
   };
 
@@ -2498,10 +2457,9 @@ const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
     setErrorMessage('');
     let allSuccessful = true;
     for (const shareholder of shareholders) {
-      // Only attempt to submit if name is provided (basic validation for a row)
       if (shareholder.name.trim() !== '') {
         try {
-          await onSubmit(shareholder); // Call the parent's createShareholder
+          await onSubmit(shareholder);
         } catch (error) {
           setErrorMessage(`Error adding shareholder ${shareholder.name}: ${error.message}`);
           allSuccessful = false;
@@ -2511,7 +2469,7 @@ const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
     }
     if (allSuccessful) {
       alert('All valid shareholders added successfully!');
-      setShareholders(Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' }))); // Reset form
+      setShareholders(Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' })));
     }
   };
 
@@ -2528,7 +2486,7 @@ const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
                 value={shareholder.name}
                 onChange={(e) => handleChange(index, 'name', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required={index === 0} // Make first row's name required
+                required={index === 0}
               />
             </div>
             <div>
@@ -2569,21 +2527,16 @@ const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
   );
 };
 
-
-// New Component: UserProfileForm
-const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage, setErrorMessage }) => {
-  // Initialize state using snake_case to match DB and then convert to camelCase for display if needed
+// UserProfileForm - for Name, Username, DOB, Address
+const UserProfileForm = ({ userProfile, onSubmit, errorMessage, setErrorMessage }) => {
   const [profileData, setProfileData] = useState({
-    fullName: userProfile?.full_name || '', // Display as fullName
-    username: userProfile?.username || '', // Display as username
+    fullName: userProfile?.full_name || '',
+    username: userProfile?.username || '',
     dob: userProfile?.dob || '',
     address: userProfile?.address || '',
   });
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
-    // Update form when userProfile prop changes (e.g., after initial fetch or update)
     setProfileData({
       fullName: userProfile?.full_name || '',
       username: userProfile?.username || '',
@@ -2594,14 +2547,72 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
 
   const handleProfileSubmit = (e) => {
     e.preventDefault();
-    // Pass data to parent in a format that matches DB columns (snake_case for full_name)
     onSubmit({
-      full_name: profileData.fullName, // Convert fullName back to full_name for submission
-      username: profileData.username, // Pass username
+      fullName: profileData.fullName,
+      username: profileData.username,
       dob: profileData.dob,
       address: profileData.address,
     });
   };
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow">
+      <h3 className="text-lg font-medium text-gray-900 mb-4">Profile Details</h3>
+      <form onSubmit={handleProfileSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+          <input
+            type="text"
+            value={profileData.fullName}
+            onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <input
+            type="text"
+            value={profileData.username}
+            onChange={(e) => setProfileData({...profileData, username: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Unique username"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+          <input
+            type="date"
+            value={profileData.dob}
+            onChange={(e) => setProfileData({...profileData, dob: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <textarea
+            value={profileData.address}
+            onChange={(e) => setProfileData({...profileData, address: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows="3"
+          />
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            type="submit"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          >
+            Update Profile
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// LoginDetailsForm - for Email and Password
+const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, onDeleteAccount, errorMessage, setErrorMessage }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
@@ -2610,7 +2621,7 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
       setErrorMessage('New password and confirmation do not match.');
       return;
     }
-    if (newPassword.length < 6) { // Supabase default min password length
+    if (newPassword.length < 6) {
       setErrorMessage('Password must be at least 6 characters long.');
       return;
     }
@@ -2622,58 +2633,16 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Profile</h3>
-        <form onSubmit={handleProfileSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-            <input
-              type="text"
-              value={profileData.fullName} // Display using camelCase
-              onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-            <input
-              type="text"
-              value={profileData.username}
-              onChange={(e) => setProfileData({...profileData, username: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Unique username"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-            <input
-              type="date"
-              value={profileData.dob}
-              onChange={(e) => setProfileData({...profileData, dob: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-            <textarea
-              value={profileData.address}
-              onChange={(e) => setProfileData({...profileData, address: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows="3"
-            />
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-            >
-              Update Profile
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Login Information</h3>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email (Cannot be changed directly)</label>
+          <input
+            type="email"
+            value={userEmail || ''}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+            readOnly
+          />
+        </div>
         <form onSubmit={handlePasswordSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
@@ -2704,6 +2673,32 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Account Actions</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Deactivate your account to free up your email for new sign-ups, or permanently delete your account and all associated company data.
+        </p>
+        <div className="flex space-x-4">
+          <button
+            onClick={onDeactivateAccount}
+            className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 flex items-center"
+          >
+            <User className="h-4 w-4 mr-2" />
+            Deactivate Account
+          </button>
+          <button
+            onClick={onDeleteAccount}
+            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete My Account
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          *Note: Deactivating changes your email and status. Deleting removes your data. The core authentication record in Supabase `auth.users` cannot be deleted directly from the client-side for security reasons.
+        </p>
       </div>
     </div>
   );
