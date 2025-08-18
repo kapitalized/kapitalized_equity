@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'; // Added useRef for PDF capture
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download } from 'lucide-react'; // Added Download icon
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown } from 'lucide-react'; // Added Download and ChevronDown icons
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 // REMOVED: import { createClient } from '@supabase/supabase-js'; // This import caused resolution issues
@@ -10,7 +10,7 @@ import _ from 'lodash';
 // environment variables are correctly set in Vercel.
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
 // IMPORTANT: Replaced with your CURRENT Supabase Anon Key
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslhlU7iiE";
 
 let supabase = null;
 // Check if window.supabase exists (meaning the CDN script has loaded)
@@ -43,7 +43,7 @@ const EquityManagementApp = () => {
   const [showLogin, setShowLogin] = useState(true);
   const [showSignUp, setShowSignUp] = useState(false);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [signUpData, setSignUpData] = useState({ email: '', password: '', fullName: '' });
+  const [signUpData, setSignUpData] = useState({ email: '', password: '', fullName: '', username: '' }); // Added username
   const [userProfile, setUserProfile] = useState(null); // For user profile management
 
   const [showCreateCompany, setShowCreateCompany] = useState(false);
@@ -54,6 +54,7 @@ const EquityManagementApp = () => {
   const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false); // New bulk add shareholder modal
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false); // For delete account confirmation
   const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false); // For deactivate account confirmation
+  const [showLoginDetailsModal, setShowLoginDetailsModal] = useState(false); // For login details modal
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
@@ -137,13 +138,17 @@ const EquityManagementApp = () => {
       return;
     }
     try {
+      // Generate a random username if not provided
+      const generatedUsername = signUpData.username || `user_${Math.random().toString(36).substring(2, 9)}`;
+      
       const { data, error } = await supabase.auth.signUp({
         email: signUpData.email,
         password: signUpData.password,
-        // Pass full_name in raw_user_meta_data for the trigger to pick up
+        // Pass full_name and username in raw_user_meta_data for the trigger to pick up
         options: {
           data: {
-            full_name: signUpData.fullName // Ensure this matches the DB column name for the trigger
+            full_name: signUpData.fullName,
+            username: generatedUsername
           }
         }
       });
@@ -152,8 +157,6 @@ const EquityManagementApp = () => {
       if (error) {
         setErrorMessage(error.message);
       } else if (data.user) {
-        // Removed client-side insert for user_profiles.
-        // The database trigger `on_auth_user_created` will handle this automatically.
         setSignUpSuccessMessage('Sign up successful! Please check your email to confirm your account. You can now log in.');
         
         // --- Create dummy data for the new user ---
@@ -301,11 +304,30 @@ const EquityManagementApp = () => {
       return;
     }
     try {
+      // Check for unique username if it's being changed
+      if (profileData.username && profileData.username !== userProfile?.username) {
+        const { data: existingUser, error: checkError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('username', profileData.username)
+          .single();
+        
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows found
+          throw checkError;
+        }
+        if (existingUser && existingUser.id !== user.id) {
+          setErrorMessage('Username is already taken. Please choose a different one.');
+          setLoading(false);
+          return;
+        }
+      }
+
       // Ensure data sent matches database column names (snake_case)
       const dataToUpdate = {
         full_name: profileData.fullName, // Convert from camelCase to snake_case
         dob: profileData.dob,
         address: profileData.address,
+        username: profileData.username, // Include username
       };
       const { data, error } = await supabase
         .from('user_profiles')
@@ -415,8 +437,10 @@ const EquityManagementApp = () => {
     try {
         const currentEmail = user.email;
         const timestamp = new Date().getTime();
-        // Change email to something unique to free up the original email for new sign-ups
-        const newEmail = `${currentEmail.split('@')[0]}[inactive-${timestamp}]@${currentEmail.split('@')[1]}`;
+        // Generate a valid email alias: original_local_part+inactive-timestamp@domain.com
+        // This is a common and valid way to "deactivate" an email without changing the core user identity.
+        const [localPart, domain] = currentEmail.split('@');
+        const newEmail = `${localPart}+inactive-${timestamp}@${domain}`;
 
         // 1. Update email in auth.users
         const { data: authUpdateData, error: authUpdateError } = await supabase.auth.updateUser({
@@ -1012,6 +1036,61 @@ const EquityManagementApp = () => {
     }
   };
 
+  // --- CSV Download Function ---
+  const handleDownloadCsv = () => {
+    if (!selectedCompany || shareholderData.length === 0) {
+      setErrorMessage("No shareholder data to download for CSV.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      // CSV Header
+      const headers = ["Name", "Email", "Type", "Total Shares", "Total Value", "Holdings Details"];
+      let csvContent = headers.join(",") + "\n";
+
+      // CSV Rows
+      shareholderData.forEach(sh => {
+        const holdingsString = sh.holdings.map(h =>
+          `${h.shareClassName}: ${h.shares} @ $${h.price_per_share} (Round: ${h.round || 'N/A'}) - Value: $${h.valuation}`
+        ).join('; '); // Use semicolon to separate multiple holdings within one cell
+
+        const row = [
+          `"${sh.name}"`, // Wrap in quotes to handle commas in names
+          `"${sh.email}"`,
+          `"${sh.type}"`,
+          sh.totalShares,
+          sh.totalValue.toFixed(2),
+          `"${holdingsString}"`
+        ];
+        csvContent += row.join(",") + "\n";
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      if (link.download !== undefined) { // Feature detection for download attribute
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${selectedCompany.name}_Shareholders.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert('Your browser does not support downloading files directly. Please copy the data manually.');
+      }
+      alert('Shareholders data downloaded as CSV!');
+
+    } catch (error) {
+      console.error("Error generating CSV:", error);
+      setErrorMessage('Failed to generate CSV: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const companyData = getCompanyData();
   const shareholderData = getShareholderData();
@@ -1092,6 +1171,15 @@ const EquityManagementApp = () => {
               </div>
               <div className="mb-4">
                 <input
+                  type="text" // Changed to text for username
+                  placeholder="Username (optional, auto-generated if empty)"
+                  value={signUpData.username}
+                  onChange={(e) => setSignUpData({...signUpData, username: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="mb-4">
+                <input
                   type="email"
                   placeholder="Email"
                   value={signUpData.email}
@@ -1145,14 +1233,31 @@ const EquityManagementApp = () => {
                 <span className="ml-4 text-sm text-gray-500">• {selectedCompany.name}</span>
               )}
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user?.email || 'Guest'}</span>
+            {/* My Account Dropdown */}
+            <div className="relative">
               <button
-                onClick={handleLogout}
-                className="text-sm text-red-600 hover:text-red-800 flex items-center"
+                onClick={() => setShowLoginDetailsModal(!showLoginDetailsModal)}
+                className="flex items-center text-sm text-gray-600 hover:text-gray-800 focus:outline-none"
               >
-                <LogOut className="h-4 w-4 mr-1" /> Logout
+                <User className="h-5 w-5 mr-1" />
+                {userProfile?.username || user?.email || 'My Account'} <ChevronDown className="ml-1 h-4 w-4" />
               </button>
+              {showLoginDetailsModal && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                  <button
+                    onClick={() => { setActiveTab('account'); setShowLoginDetailsModal(false); }}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                  >
+                    Login Details
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1203,8 +1308,8 @@ const EquityManagementApp = () => {
                   { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
                   { id: 'shareholders', name: 'Shareholders', icon: Users },
                   { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
-                  { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload }, // New Tab
-                  { id: 'account', name: 'My Account', icon: User } // New Tab (Bulk Add Shareholders moved to Shareholders tab)
+                  { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload },
+                  { id: 'reports', name: 'Reports', icon: Download } // New Reports Tab
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -1298,15 +1403,6 @@ const EquityManagementApp = () => {
                       </table>
                     </div>
                   </div>
-                </div>
-                <div className="flex justify-end mt-6">
-                  <button
-                    onClick={handleDownloadPdf}
-                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Company Profile PDF
-                  </button>
                 </div>
               </div>
             )}
@@ -1472,7 +1568,40 @@ const EquityManagementApp = () => {
               </div>
             )}
 
-            {/* My Account Tab */}
+            {/* Reports Tab */}
+            {activeTab === 'reports' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Reports</h2>
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Company Profile Report (PDF)</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
+                  </p>
+                  <button
+                    onClick={handleDownloadPdf}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Company Profile PDF
+                  </button>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Shareholders Data (CSV)</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Download a CSV file containing all shareholder details for the selected company.
+                  </p>
+                  <button
+                    onClick={handleDownloadCsv}
+                    className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700 flex items-center"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Shareholders CSV
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* My Account Tab (now accessed via dropdown) */}
             {activeTab === 'account' && (
               <div className="space-y-6">
                 <h2 className="text-xl font-semibold text-gray-900">My Account</h2>
@@ -1804,7 +1933,7 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
     shareClassId: initialData.share_class_id || '',
     shares: initialData.shares || '',
     pricePerShare: initialData.price_per_share || '',
-    issueDate: initialData.issue_date || new Date().toISOString().split('T')[0],
+    issueDate: new Date().toISOString().split('T')[0],
     round: initialData.round || '', // New field for issuance round
   });
   const handleSubmit = (e) => {
@@ -2156,6 +2285,7 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
   // Initialize state using snake_case to match DB and then convert to camelCase for display if needed
   const [profileData, setProfileData] = useState({
     fullName: userProfile?.full_name || '', // Display as fullName
+    username: userProfile?.username || '', // Display as username
     dob: userProfile?.dob || '',
     address: userProfile?.address || '',
   });
@@ -2166,6 +2296,7 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
     // Update form when userProfile prop changes (e.g., after initial fetch or update)
     setProfileData({
       fullName: userProfile?.full_name || '',
+      username: userProfile?.username || '',
       dob: userProfile?.dob || '',
       address: userProfile?.address || '',
     });
@@ -2176,6 +2307,7 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
     // Pass data to parent in a format that matches DB columns (snake_case for full_name)
     onSubmit({
       full_name: profileData.fullName, // Convert fullName back to full_name for submission
+      username: profileData.username, // Pass username
       dob: profileData.dob,
       address: profileData.address,
     });
@@ -2209,6 +2341,16 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
               value={profileData.fullName} // Display using camelCase
               onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input
+              type="text"
+              value={profileData.username}
+              onChange={(e) => setProfileData({...profileData, username: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Unique username"
             />
           </div>
           <div>
@@ -2276,4 +2418,5 @@ const UserProfileForm = ({ userProfile, onSubmit, onPasswordChange, errorMessage
     </div>
   );
 };
+
 export default EquityManagementApp;
