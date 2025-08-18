@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings } from 'lucide-react'; // Added Settings icon
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 import { supabase } from './config/supabase'; // IMPORTED FROM NEW FILE
+import AdminDashboard from './AdminDashboard'; // Import the new AdminDashboard component
+
 
 // IMPORTANT: Replace with the URL of your Vercel Serverless Function
 // When deployed on Vercel, this will typically be /api/equity-calculator
@@ -55,10 +57,10 @@ const EquityManagementApp = () => {
   const [futureScenarioResults, setFutureScenarioResults] = useState(null);
   const [selectedRound, setSelectedRound] = useState('current');
 
-  // Sidebar state declarations (FIXED: moved here)
+  // Sidebar state declarations
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // My Account sub-tab state declaration (FIXED: moved here)
+  // My Account sub-tab state declaration
   const [myAccountSubTab, setMyAccountSubTab] = useState('profile');
 
 
@@ -440,10 +442,10 @@ const EquityManagementApp = () => {
     } catch (error) {
         setErrorMessage('Error deactivating account: ' + error.message);
     } finally {
-        setLoading(false);
-        setShowConfirmDeactivateModal(false);
+      setLoading(false);
+      setShowConfirmDeactivateModal(false);
     }
-};
+  };
 
 
   const createSampleDataForNewUser = async (userId) => {
@@ -1252,7 +1254,7 @@ const EquityManagementApp = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex"> {/* Changed to flex for sidebar layout */}
+    <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <div className={`bg-white shadow-md transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-64'} h-screen flex flex-col`}>
         <div className="flex items-center justify-between p-4 border-b">
@@ -1272,8 +1274,9 @@ const EquityManagementApp = () => {
             { id: 'shareholders', name: 'Shareholders', icon: Users },
             { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
             { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload },
-            { id: 'reports', name: 'Reports', icon: Download }
-          ].map(tab => (
+            { id: 'reports', name: 'Reports', icon: Download },
+            userProfile?.is_admin && { id: 'admin', name: 'Admin Dashboard', icon: Settings }
+          ].filter(Boolean).map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -1893,6 +1896,10 @@ const EquityManagementApp = () => {
                   )}
                 </div>
               )}
+
+              {activeTab === 'admin' && userProfile?.is_admin && (
+                <AdminDashboard errorMessage={errorMessage} setErrorMessage={setErrorMessage} />
+              )}
             </>
           )}
         </div>
@@ -2426,7 +2433,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
           </div>
         </div>
       ))}
-      <div className="flex justify-between items-center mt-6">
+      <div className="flex justify-end space-x-2 mt-6">
         <button
           type="button"
           onClick={addRow}
