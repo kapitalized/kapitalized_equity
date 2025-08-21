@@ -24,7 +24,7 @@ const theme = {
 
 // Supabase client initialization (Now relies solely on window.supabase from CDN)
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Updated key placeholder
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Corrected key
 
 let supabase = null;
 if (typeof window !== 'undefined' && window.supabase) { // Ensure window.supabase exists from CDN
@@ -236,7 +236,7 @@ const EquityManagementApp = () => {
   const [shareholders, setShareholders] = useState([]);
   const [shareClasses, setShareClasses] = useState([]);
   const [shareIssuances, setShareIssuances] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('productSelect'); // Initial tab is now product select
   const [errorMessage, setErrorMessage] = useState('');
   const [signUpSuccessMessage, setSignUpSuccessMessage] = useState('');
 
@@ -1526,11 +1526,13 @@ const EquityManagementApp = () => {
         </div>
         <nav className="flex-1 px-2 py-4 space-y-2">
           {[
-            { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
+            { id: 'productSelect', name: 'Product Select', icon: Settings }, // New Product Select
+            { id: 'equityHome', name: 'Equity Home', icon: BarChart3 }, // Renamed Dashboard
             { id: 'shareholders', name: 'Shareholders', icon: Users },
             { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
             { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload },
             { id: 'reports', name: 'Reports', icon: Download },
+            { id: 'futureScenario', name: 'Future Scenario', icon: BarChart3 }, // New Future Scenario tab
             userProfile?.is_admin && { id: 'admin', name: 'Admin Dashboard', icon: Settings }
           ].filter(Boolean).map(tab => (
             <button
@@ -1556,8 +1558,32 @@ const EquityManagementApp = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
               <div className="flex items-center">
-                {selectedCompany && (
+                {selectedCompany && activeTab !== 'productSelect' && ( // Only show company name if not on product select page
                   <h1 className="text-xl font-semibold" style={{ color: theme.text }}>{selectedCompany.name}</h1>
+                )}
+                {activeTab === 'productSelect' && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Product Selection</h1>
+                )}
+                {activeTab === 'equityHome' && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Equity Home</h1>
+                )}
+                {activeTab === 'shareholders' && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Shareholders</h1>
+                )}
+                {activeTab === 'issuances' && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Share Issuances</h1>
+                )}
+                {activeTab === 'bulk-add' && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Bulk Add Shares</h1>
+                )}
+                {activeTab === 'reports' && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Reports & Scenarios</h1>
+                )}
+                {activeTab === 'futureScenario' && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Future Scenario</h1>
+                )}
+                {activeTab === 'admin' && userProfile?.is_admin && (
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Admin Dashboard</h1>
                 )}
               </div>
               {/* User Account Dropdown */}
@@ -1607,59 +1633,90 @@ const EquityManagementApp = () => {
             </div>
           )}
 
-          {/* Company Selection - remains at the top of the main content */}
-          <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow">
-            <div className="flex items-center space-x-4">
-              <label htmlFor="company-select" className="text-sm font-medium" style={{ color: theme.text }}>Select Company:</label>
-              <select
-                id="company-select"
-                value={selectedCompany?.id || ''}
-                onChange={(e) => {
-                  const company = companies.find(c => c.id == e.target.value);
-                  setSelectedCompany(company);
-                }}
-                className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
-                style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
-              >
-                <option value="">Select Company</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
-                ))}
-              </select>
+          {/* Product Selector Page */}
+          {activeTab === 'productSelect' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Product Placeholder: Equity Management */}
+                <div 
+                  className="p-6 rounded-lg shadow cursor-pointer flex flex-col items-center justify-center text-center" 
+                  style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }} 
+                  onClick={() => setActiveTab('equityHome')} // Navigate to Equity Home
+                >
+                  <BarChart3 className="h-12 w-12 mb-3" style={{ color: theme.primary }} />
+                  <h3 className="text-lg font-medium" style={{ color: theme.primary }}>Equity Management</h3>
+                  <p className="text-sm" style={{ color: theme.lightText }}>Manage your company's cap table and issuances.</p>
+                </div>
+                {/* Product Placeholder: Valuations */}
+                <div className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center" style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}>
+                  <Download className="h-12 w-12 mb-3" style={{ color: theme.lightText }} />
+                  <h3 className="text-lg font-medium" style={{ color: theme.text }}>Valuations</h3>
+                  <p className="text-sm" style={{ color: theme.lightText }}>Analyze company valuations and financial models.</p>
+                  <p className="mt-2 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
+                </div>
+                {/* Product Placeholder: Dataroom */}
+                <div className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center" style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}>
+                  <Upload className="h-12 w-12 mb-3" style={{ color: theme.lightText }} />
+                  <h3 className="text-lg font-medium" style={{ color: theme.text }}>Dataroom</h3>
+                  <p className="text-sm" style={{ color: theme.lightText }}>Securely share documents with investors and advisors.</p>
+                  <p className="mt-2 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={() => setShowCreateCompany(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
-              style={{ backgroundColor: theme.primary }}
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Company
-            </button>
-          </div>
+          )}
 
-          {selectedCompany && (
+          {/* Conditional rendering for other tabs, only if not on productSelect and a company is selected */}
+          {activeTab !== 'productSelect' && selectedCompany && (
             <>
-              {activeTab === 'dashboard' && (
+              {/* Company Selection - remains at the top of the main content */}
+              <div className="mb-6 flex justify-between items-center p-4 rounded-lg shadow" style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground }}>
+                <div className="flex items-center space-x-4">
+                  <label htmlFor="company-select" className="text-sm font-medium" style={{ color: theme.text }}>Select Company:</label>
+                  <select
+                    id="company-select"
+                    value={selectedCompany?.id || ''}
+                    onChange={(e) => {
+                      const company = companies.find(c => c.id == e.target.value);
+                      setSelectedCompany(company);
+                    }}
+                    className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                    style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
+                  >
+                    <option value="">Select Company</option>
+                    {companies.map(company => (
+                      <option key={company.id} value={company.id}>{company.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() => setShowCreateCompany(true)}
+                  className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                  style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  New Company
+                </button>
+              </div>
+
+              {activeTab === 'equityHome' && ( // Renamed from dashboard
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Dashboard</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Product Placeholder: Equity Management */}
-                    <div className="bg-white p-6 rounded-lg shadow cursor-pointer" style={{ backgroundColor: theme.cardBackground }} onClick={() => setActiveTab('dashboard')}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.primary }}>Equity Management</h3>
-                      <p className="text-sm" style={{ color: theme.lightText }}>Manage your company's equity cap table and issuances.</p>
-                      <button className="mt-4 text-sm font-medium" style={{ color: theme.primary }}>Go to App</button>
+                  {/* Page Title Handled by main header */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Total Shares Outstanding</h3>
+                      <p className="text-3xl font-bold" style={{ color: theme.primary }}>{companyData.totalShares.toLocaleString()}</p>
                     </div>
-                    {/* Product Placeholder: Valuations */}
-                    <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Valuations</h3>
-                      <p className="text-sm" style={{ color: theme.lightText }}>Analyze company valuations and financial models.</p>
-                      <p className="mt-4 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
+                    <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Total Equity Value (Sum of issuances)</h3>
+                      <p className="text-3xl font-bold" style={{ color: theme.secondary }}>${companyData.totalValue.toLocaleString()}</p>
                     </div>
-                    {/* Product Placeholder: Dataroom */}
-                    <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Dataroom</h3>
-                      <p className="text-sm" style={{ color: theme.lightText }}>Securely share documents with investors and advisors.</p>
-                      <p className="mt-4 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
+                    <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Latest Valuation per Share</h3>
+                      <p className="text-3xl font-bold" style={{ color: theme.primary }}>${companyData.latestValuationPerShare.toFixed(2)}</p>
+                    </div>
+                    <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Company Valuation (Total Shares x Latest Price)</h3>
+                      <p className="text-3xl font-bold" style={{ color: theme.accent }}>${companyData.companyValuation.toLocaleString()}</p>
                     </div>
                   </div>
 
@@ -1686,7 +1743,7 @@ const EquityManagementApp = () => {
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="bg-white p-6 rounded-lg shadow">
+                    <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
                       <h3 className="lg:text-lg font-medium" style={{ color: theme.text }}>Share Classes (by Priority)</h3>
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
@@ -1724,24 +1781,24 @@ const EquityManagementApp = () => {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => setShowCreateShareClass(true)}
-                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
-                        style={{ backgroundColor: theme.secondary }}
+                        className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                        style={{ backgroundColor: theme.secondary, color: theme.cardBackground }}
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
                         New Share Class
                       </button>
                       <button
                         onClick={() => setShowBulkAddShareholder(true)}
-                        className="text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                        style={{ backgroundColor: theme.primary }}
+                        className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                        style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
                         Bulk Add Shareholders
                       </button>
                       <button
                         onClick={() => setShowCreateShareholder(true)}
-                        className="text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                        style={{ backgroundColor: theme.primary }}
+                        className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                        style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
                         New Shareholder
@@ -1792,8 +1849,8 @@ const EquityManagementApp = () => {
                     <h2 className="text-xl font-semibold" style={{ color: theme.text }}>Share Issuances</h2>
                     <button
                       onClick={() => setShowCreateIssuance(true)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
-                      style={{ backgroundColor: theme.primary }}
+                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                      style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
                       New Issuance
@@ -2100,8 +2157,8 @@ const EquityManagementApp = () => {
                     </p>
                     <button
                       onClick={handleDownloadPdf}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                      style={{ backgroundColor: theme.primary }}
+                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                      style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download Company Profile PDF
@@ -2114,8 +2171,8 @@ const EquityManagementApp = () => {
                     </p>
                     <button
                       onClick={handleDownloadCsv}
-                      className="bg-teal-600 text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                      style={{ backgroundColor: theme.secondary }}
+                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                      style={{ backgroundColor: theme.secondary, color: theme.cardBackground }}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download Shareholders CSV
