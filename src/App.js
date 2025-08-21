@@ -2037,11 +2037,42 @@ const EquityManagementApp = () => {
                   </div>
 
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Company Profile Report (PDF)</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
+                      Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
+                    </p>
+                    <button
+                      onClick={handleDownloadPdf}
+                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                      style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Company Profile PDF
+                    </button>
+                  </div>
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Shareholders Data (CSV)</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
+                      Download a CSV file containing all shareholder details for the selected company.
+                    </p>
+                    <button
+                      onClick={handleDownloadCsv}
+                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                      style={{ backgroundColor: theme.secondary, color: theme.cardBackground }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Shareholders CSV
+                    </button>
+                  </div>
+                </div>
+              )}
+               {activeTab === 'futureScenario' && (
+                <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
                     <h3 className="text-lg font-medium" style={{ color: theme.text }}>Future Scenario Planning</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
-                      Input a hypothetical future issuance to see its impact on current equity distribution.
+                      Input a hypothetical future issuance to see its impact on current equity distribution. This does not affect your current shares, it is only for planning purposes.
                     </p>
-                    <form onSubmit={handleCalculateFutureScenario} className="space-y-4">
+                    <form onSubmit={handleCalculateFutureScenario} className="space-y-4 mt-4">
                       <div>
                         <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Shareholder for Future Issuance</label>
                         <select
@@ -2121,16 +2152,33 @@ const EquityManagementApp = () => {
                     {futureScenarioResults && (
                       <div className="mt-6 p-4 rounded-lg border" style={{ backgroundColor: theme.background, borderColor: theme.borderColor }}>
                         <h4 className="text-lg font-semibold mb-3" style={{ color: theme.text }}>Future Scenario Results:</h4>
-                        <p style={{ color: theme.lightText }}>Total Shares (Future): {futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
-                        <p style={{ color: theme.lightText }}>Total Value (Future): ${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <p className="font-semibold" style={{ color: theme.text }}>Total Current Shares:</p>
+                                <p style={{ color: theme.lightText }}>{futureScenarioResults.current_state.totalShares.toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p className="font-semibold" style={{ color: theme.text }}>Total Future Shares:</p>
+                                <p style={{ color: theme.lightText }}>{futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
+                            </div>
+                             <div>
+                                <p className="font-semibold" style={{ color: theme.text }}>Total Current Value:</p>
+                                <p style={{ color: theme.lightText }}>${futureScenarioResults.current_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                            </div>
+                             <div>
+                                <p className="font-semibold" style={{ color: theme.text }}>Total Future Value:</p>
+                                <p style={{ color: theme.lightText }}>${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                            </div>
+                        </div>
+
                         <h5 className="font-semibold mt-3" style={{ color: theme.text }}>Shareholder Impact:</h5>
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
                             <thead style={{ backgroundColor: theme.cardBackground }}>
                               <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Current %</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Future %</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Current Shareholding %</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Future Shareholding %</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>% Change</th>
                               </tr>
                             </thead>
@@ -2140,7 +2188,7 @@ const EquityManagementApp = () => {
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{sh.name}</td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.currentPercentage.toFixed(2)}%</td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.futurePercentage.toFixed(2)}%</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.percentageChange.toFixed(2)}%</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: sh.percentageChange > 0 ? 'green' : 'red' }}>{sh.percentageChange.toFixed(2)}%</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -2149,38 +2197,7 @@ const EquityManagementApp = () => {
                       </div>
                     )}
                   </div>
-
-                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Company Profile Report (PDF)</h3>
-                    <p className="text-sm" style={{ color: theme.lightText }}>
-                      Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
-                    </p>
-                    <button
-                      onClick={handleDownloadPdf}
-                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                      style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Company Profile PDF
-                    </button>
-                  </div>
-                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Shareholders Data (CSV)</h3>
-                    <p className="text-sm" style={{ color: theme.lightText }}>
-                      Download a CSV file containing all shareholder details for the selected company.
-                    </p>
-                    <button
-                      onClick={handleDownloadCsv}
-                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                      style={{ backgroundColor: theme.secondary, color: theme.cardBackground }}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Shareholders CSV
-                    </button>
-                  </div>
-                </div>
               )}
-
               {activeTab === 'account' && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>My Account</h2>
