@@ -1,22 +1,234 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings } from 'lucide-react'; // Added Settings icon
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
-import { supabase } from './config/supabase'; // IMPORTED FROM NEW FILE
-import AdminDashboard from './AdminDashboard'; // Import the new AdminDashboard component
+// REMOVED: import { createClient } from '@supabase/supabase-js'; // THIS LINE IS NOW REMOVED
 
 
 // IMPORTANT: Replace with the URL of your Vercel Serverless Function
-// When deployed on Vercel, this will typically be /api/equity-calculator
 const PYTHON_BACKEND_URL = "/api/equity-calculator";
+// IMPORTANT: Replace with your WooCommerce Subscription Product URL
+const WOOCOMMERCE_SUBSCRIPTION_URL = "https://your-wordpress-site.com/product/your-subscription-product/";
+
+// Define the main theme colors for consistency
+const theme = {
+  primary: '#1a73e8', // Blue from dashboard design
+  secondary: '#34a853', // Green
+  accent: '#fbbc05', // Yellow
+  background: '#f8f9fa', // Light gray background
+  cardBackground: '#ffffff', // White card background
+  text: '#202124', // Dark gray text
+  lightText: '#5f6368', // Lighter gray text
+  borderColor: '#dadce0', // Light gray border
+};
+
+// Supabase client initialization (Now relies solely on window.supabase from CDN)
+const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Updated key placeholder
+
+let supabase = null;
+if (typeof window !== 'undefined' && window.supabase) { // Ensure window.supabase exists from CDN
+  supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+} else {
+  console.error("Supabase client could not be initialized. Ensure Supabase CDN script is loaded in public/index.html.");
+}
+
+
+// AdminDashboard Component (Consolidated directly into App.js)
+const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
+  const [loadingAdminData, setLoadingAdminData] = useState(true);
+  const [allUsers, setAllUsers] = useState([]);
+  const [allCompanies, setAllCompanies] = useState([]);
+  const [allIssuances, setAllIssuances] = useState([]);
+
+  const fetchAllAdminData = async () => {
+    setLoadingAdminData(true);
+    setErrorMessage('');
+    try {
+      const usersResponse = await fetch(`${PYTHON_BACKEND_URL}/admin/users`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
+      const usersData = await usersResponse.json();
+      setAllUsers(usersData);
+
+      const companiesResponse = await fetch(`${PYTHON_BACKEND_URL}/admin/companies`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
+      const companiesData = await companiesResponse.json();
+      setAllCompanies(companiesData);
+
+      const issuancesResponse = await fetch(`${PYTHON_BACKEND_URL}/admin/issuances`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
+      const issuancesData = await issuancesResponse.json();
+      setAllIssuances(issuancesData);
+
+    } catch (error) {
+      console.error("Error fetching admin data:", error);
+      setErrorMessage('Failed to fetch admin data: ' + error.message);
+    } finally {
+      setLoadingAdminData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllAdminData();
+  }, []);
+
+  const handleAdminDelete = async (id, type) => {
+    if (!window.confirm(`Are you sure you want to delete this ${type} and all its associated data? This cannot be undone.`)) {
+      return;
+    }
+    setLoadingAdminData(true);
+    setErrorMessage('');
+    try {
+      const response = await fetch(`${PYTHON_BACKEND_URL}/admin/delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, type }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorText}`);
+      }
+      alert(`${type} deleted successfully!`);
+      fetchAllAdminData();
+    } catch (error) {
+      console.error(`Error deleting ${type}:`, error);
+      setErrorMessage(`Failed to delete ${type}: ` + error.message);
+    } finally {
+      setLoadingAdminData(false);
+    }
+  };
+
+  if (loadingAdminData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+        <p className="ml-3 text-lg text-gray-700">Loading Admin Data...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Admin Dashboard</h2>
+
+      <div className="bg-white shadow rounded-lg p-6" style={{ backgroundColor: theme.cardBackground }}>
+        <h3 className="text-xl font-medium" style={{ color: theme.text }}>All Users</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+            <thead style={{ backgroundColor: theme.background }}>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Username</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Full Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Is Admin</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
+              {allUsers.map(user => (
+                <tr key={user.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={user.id}>{user.id.substring(0, 8)}...</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.username || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.full_name || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.status}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.is_admin ? 'Yes' : 'No'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button onClick={() => handleAdminDelete(user.id, 'user')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg p-6" style={{ backgroundColor: theme.cardBackground }}>
+        <h3 className="text-xl font-medium" style={{ color: theme.text }}>All Companies</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+            <thead style={{ backgroundColor: theme.background }}>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Description</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Owner User ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
+              {allCompanies.map(company => (
+                <tr key={company.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.id}>{company.id.substring(0, 8)}...</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.description || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.user_id}>{company.user_id.substring(0, 8)}...</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button onClick={() => handleAdminDelete(company.id, 'company')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg p-6" style={{ backgroundColor: theme.cardBackground }}>
+        <h3 className="text-xl font-medium" style={{ color: theme.text }}>All Share Issuances</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+            <thead style={{ backgroundColor: theme.background }}>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Company ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shareholder ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Price/Share</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Issue Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
+              {allIssuances.map(issuance => (
+                <tr key={issuance.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.id}>{issuance.id.substring(0, 8)}...</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.company_id}>{issuance.company_id.substring(0, 8)}...</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.shareholder_id}>{issuance.shareholder_id.substring(0, 8)}...</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.shares.toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${issuance.price_per_share.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.issue_date}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button onClick={() => handleAdminDelete(issuance.id, 'issuance')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 const EquityManagementApp = () => {
-  // Refs for PDF capture
   const dashboardRef = useRef();
   const pieChartRef = useRef();
 
-  // State management
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
@@ -28,7 +240,6 @@ const EquityManagementApp = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [signUpSuccessMessage, setSignUpSuccessMessage] = useState('');
 
-  // Form/Modal states
   const [showLogin, setShowLogin] = useState(true);
   const [showSignUp, setShowSignUp] = useState(false);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
@@ -45,7 +256,6 @@ const EquityManagementApp = () => {
   const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false);
   const [showLoginDetailsDropdown, setShowLoginDetailsDropdown] = useState(false);
 
-  // New states for Reports tab
   const [futureIssuanceData, setFutureIssuanceData] = useState({
     shareholderId: '',
     shareClassId: '',
@@ -57,16 +267,14 @@ const EquityManagementApp = () => {
   const [futureScenarioResults, setFutureScenarioResults] = useState(null);
   const [selectedRound, setSelectedRound] = useState('current');
 
-  // Sidebar state declarations
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  // My Account sub-tab state declaration
   const [myAccountSubTab, setMyAccountSubTab] = useState('profile');
+
+  const [isPremiumUser, setIsPremiumUser] = useState(false);
 
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
-  // --- Supabase Authentication ---
   useEffect(() => {
     if (!supabase) {
       setLoading(false);
@@ -90,6 +298,7 @@ const EquityManagementApp = () => {
           setShareClasses([]);
           setShareIssuances([]);
           setUserProfile(null);
+          setIsPremiumUser(false);
         }
       }
     );
@@ -108,6 +317,29 @@ const EquityManagementApp = () => {
       authListener?.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (userProfile && userProfile.subscription_status === 'active') {
+      setIsPremiumUser(true);
+    } else {
+      setIsPremiumUser(false);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') === 'success') {
+      alert('Payment successful! Your premium features should now be active.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (user) {
+        fetchUserProfile(user.id);
+      }
+    } else if (params.get('payment') === 'cancelled') {
+      alert('Payment was cancelled. You still have free access.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [user]);
+
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -1013,7 +1245,7 @@ const EquityManagementApp = () => {
         sh.type,
         sh.totalShares.toLocaleString(),
         `$${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
-        sh.holdings.map(h => `${h.shareClassName}: ${h.shares.toLocaleString()} @ $${h.price_per_share.toFixed(2)} (Round: ${h.round || 'N/A'})`).join('\n')
+        sh.holdings.map(h => `${h.shareClassName}: ${h.shares.toLocaleString()} @ $${h.price_per_share.toFixed(2)} (Round: {h.round || 'N/A'})`).join('\n')
       ]);
       pdf.autoTable({
         startY: y,
@@ -1119,6 +1351,30 @@ const EquityManagementApp = () => {
     } catch (error) {
       console.error("Error generating CSV:", error);
       setErrorMessage('Failed to generate CSV: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckout = () => {
+    if (!user || !user.id || !user.email) {
+      setErrorMessage("User not logged in or missing user details for checkout.");
+      return;
+    }
+    if (!WOOCOMMERCE_SUBSCRIPTION_URL) {
+      setErrorMessage("WooCommerce Subscription URL is not configured.");
+      return;
+    }
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      const redirectUrl = `${WOOCOMMERCE_SUBSCRIPTION_URL}?add-to-cart=YOUR_PRODUCT_ID&variation_id=YOUR_VARIATION_ID&quantity=1&_wpnonce=NONCE_HERE&user_id=${user.id}&user_email=${user.email}`;
+      window.location.href = redirectUrl;
+
+    } catch (error) {
+      console.error("Error initiating WooCommerce Checkout:", error);
+      setErrorMessage('Failed to initiate payment: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -1259,7 +1515,7 @@ const EquityManagementApp = () => {
       <div className={`bg-white shadow-md transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-64'} h-screen flex flex-col`}>
         <div className="flex items-center justify-between p-4 border-b">
           {!isSidebarCollapsed && (
-            <h2 className="text-xl font-semibold text-gray-900 truncate">Kapitalized</h2>
+            <img src="https://placehold.co/150x40/transparent/white?text=KAP+Logo" alt="KAP Logo" className="h-10" />
           )}
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -1294,21 +1550,21 @@ const EquityManagementApp = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col" style={{ backgroundColor: theme.background }}>
         {/* Top Header for Main Content */}
-        <div className="bg-white shadow-sm border-b">
+        <div className="bg-white shadow-sm border-b" style={{ borderColor: theme.borderColor }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
               <div className="flex items-center">
                 {selectedCompany && (
-                  <h1 className="text-xl font-semibold text-gray-900">{selectedCompany.name}</h1>
+                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>{selectedCompany.name}</h1>
                 )}
               </div>
               {/* User Account Dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)}
-                  className="flex items-center text-sm text-gray-600 hover:text-gray-800 focus:outline-none"
+                  className="flex items-center text-sm" style={{ color: theme.lightText }}
                 >
                   <User className="h-5 w-5 mr-1" />
                   {userProfile?.username || user?.email || 'My Account'} <ChevronDown className="ml-1 h-4 w-4" />
@@ -1352,15 +1608,18 @@ const EquityManagementApp = () => {
           )}
 
           {/* Company Selection - remains at the top of the main content */}
-          <div className="mb-6 flex justify-between items-center">
+          <div className="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow">
             <div className="flex items-center space-x-4">
+              <label htmlFor="company-select" className="text-sm font-medium" style={{ color: theme.text }}>Select Company:</label>
               <select
+                id="company-select"
                 value={selectedCompany?.id || ''}
                 onChange={(e) => {
                   const company = companies.find(c => c.id == e.target.value);
                   setSelectedCompany(company);
                 }}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
               >
                 <option value="">Select Company</option>
                 {companies.map(company => (
@@ -1371,6 +1630,7 @@ const EquityManagementApp = () => {
             <button
               onClick={() => setShowCreateCompany(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+              style={{ backgroundColor: theme.primary }}
             >
               <PlusCircle className="h-4 w-4 mr-2" />
               New Company
@@ -1381,29 +1641,31 @@ const EquityManagementApp = () => {
             <>
               {activeTab === 'dashboard' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-white p-6 rounded-lg shadow">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Total Shares Outstanding</h3>
-                      <p className="text-3xl font-bold text-blue-600">{companyData.totalShares.toLocaleString()}</p>
+                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Dashboard</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Product Placeholder: Equity Management */}
+                    <div className="bg-white p-6 rounded-lg shadow cursor-pointer" style={{ backgroundColor: theme.cardBackground }} onClick={() => setActiveTab('dashboard')}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.primary }}>Equity Management</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>Manage your company's equity cap table and issuances.</p>
+                      <button className="mt-4 text-sm font-medium" style={{ color: theme.primary }}>Go to App</button>
                     </div>
-                    <div className="bg-white p-6 rounded-lg shadow">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Total Equity Value (Sum of issuances)</h3>
-                      <p className="text-3xl font-bold text-green-600">${companyData.totalValue.toLocaleString()}</p>
+                    {/* Product Placeholder: Valuations */}
+                    <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Valuations</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>Analyze company valuations and financial models.</p>
+                      <p className="mt-4 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
                     </div>
-                    <div className="bg-white p-6 rounded-lg shadow">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Latest Valuation per Share</h3>
-                      <p className="text-3xl font-bold text-purple-600">${companyData.latestValuationPerShare.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Company Valuation (Total Shares x Latest Price)</h3>
-                      <p className="text-3xl font-bold text-yellow-600">${companyData.companyValuation.toLocaleString()}</p>
+                    {/* Product Placeholder: Dataroom */}
+                    <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Dataroom</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>Securely share documents with investors and advisors.</p>
+                      <p className="mt-4 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white p-6 rounded-lg shadow" ref={pieChartRef}>
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Share Distribution by Class</h3>
+                    <div className="bg-white p-6 rounded-lg shadow" ref={pieChartRef} style={{ backgroundColor: theme.cardBackground }}>
+                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Share Distribution by Class</h3>
                       <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                           <Pie
@@ -1425,26 +1687,26 @@ const EquityManagementApp = () => {
                       </ResponsiveContainer>
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow">
-                      <h3 className="lg:text-lg font-medium text-gray-900 mb-4">Share Classes (by Priority)</h3>
+                      <h3 className="lg:text-lg font-medium" style={{ color: theme.text }}>Share Classes (by Priority)</h3>
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
+                        <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                          <thead style={{ backgroundColor: theme.background }}>
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">%</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Class</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Value</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>%</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
+                          <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
                             {companyData.classSummary.map((item, index) => (
                               <tr key={item.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.totalShares.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.percentage}%</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.round}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{item.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.totalShares.toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.percentage}%</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.round}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1457,54 +1719,57 @@ const EquityManagementApp = () => {
 
               {activeTab === 'shareholders' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shareholders</h2>
+                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Shareholders</h2>
                   <div className="flex justify-between items-center">
                     <div className="flex space-x-2">
                       <button
                         onClick={() => setShowCreateShareClass(true)}
                         className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
+                        style={{ backgroundColor: theme.secondary }}
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
                         New Share Class
                       </button>
                       <button
                         onClick={() => setShowBulkAddShareholder(true)}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center"
+                        className="text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                        style={{ backgroundColor: theme.primary }}
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
                         Bulk Add Shareholders
                       </button>
                       <button
                         onClick={() => setShowCreateShareholder(true)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+                        className="text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                        style={{ backgroundColor: theme.primary }}
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
                         New Shareholder
                       </button>
                     </div>
                   </div>
-                  <div className="bg-white shadow rounded-lg">
+                  <div className="bg-white shadow rounded-lg" style={{ backgroundColor: theme.cardBackground }}>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                        <thead style={{ backgroundColor: theme.background }}>
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Shares</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Holdings Details</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Type</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Total Shares</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Total Value</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Holdings Details</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
                           {shareholderData.map(shareholder => (
                             <tr key={shareholder.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder.name}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.email}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.type}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareholder.totalShares.toLocaleString()}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${shareholder.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{shareholder.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareholder.email}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareholder.type}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareholder.totalShares.toLocaleString()}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${shareholder.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                              <td className="px-6 py-4 text-sm" style={{ color: theme.lightText }}>
                                 {shareholder.holdings.map((holding, idx) => (
                                   <div key={idx} className="mb-1">
                                     {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
@@ -1522,33 +1787,34 @@ const EquityManagementApp = () => {
 
               {activeTab === 'issuances' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Share Issuances</h2>
+                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Share Issuances</h2>
                   <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">Share Issuances</h2>
+                    <h2 className="text-xl font-semibold" style={{ color: theme.text }}>Share Issuances</h2>
                     <button
                       onClick={() => setShowCreateIssuance(true)}
                       className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+                      style={{ backgroundColor: theme.primary }}
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
                       New Issuance
                     </button>
                   </div>
-                  <div className="bg-white shadow rounded-lg">
+                  <div className="bg-white shadow rounded-lg" style={{ backgroundColor: theme.cardBackground }}>
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                        <thead style={{ backgroundColor: theme.background }}>
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Round</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shareholder</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Share Class</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price/Share</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shareholder</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Share Class</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Price/Share</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Total Value</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
                           {shareIssuances
                             .filter(issuance => issuance.company_id === selectedCompany.id)
                             .map(issuance => {
@@ -1556,14 +1822,14 @@ const EquityManagementApp = () => {
                               const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
                               return (
                                 <tr key={issuance.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.issue_date}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.round || 'N/A'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shareholder?.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shareClass?.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuance.shares.toLocaleString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${issuance.price_per_share.toFixed(2)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.issue_date}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round || 'N/A'}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{shareholder?.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareClass?.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.shares.toLocaleString()}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${issuance.price_per_share.toFixed(2)}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button
                                       onClick={() => deleteIssuance(issuance.id)}
                                       className="text-red-600 hover:text-red-800"
@@ -1583,10 +1849,10 @@ const EquityManagementApp = () => {
 
               {activeTab === 'bulk-add' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Bulk Add Shares</h2>
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Add Multiple Share Issuances</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Bulk Add Shares</h2>
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Add Multiple Share Issuances</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
                       Manually add multiple rows of share issuances. Select a shareholder and then add their shares.
                     </p>
                     <BulkIssuanceForm
@@ -1597,16 +1863,17 @@ const EquityManagementApp = () => {
                       setErrorMessage={setErrorMessage}
                     />
                   </div>
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Upload CSV File (Advanced)</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Upload CSV File (Advanced)</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
                       CSV format: <code className="font-mono">shareholderName, shareClassName, shares, pricePerShare, issueDate, round</code>
                     </p>
                     <input
                       type="file"
                       accept=".csv"
                       onChange={handleCsvUpload}
-                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      style={{ color: theme.lightText }}
                     />
                   </div>
                 </div>
@@ -1614,42 +1881,43 @@ const EquityManagementApp = () => {
 
               {activeTab === 'reports' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">Reports & Scenarios</h2>
+                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Reports & Scenarios</h2>
                   
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Current Equity Status</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Current Equity Status</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
                       View the current equity distribution and valuation.
                     </p>
                     <button
                       onClick={() => setSelectedRound('current')}
-                      className={`px-4 py-2 rounded-md flex items-center ${selectedRound === 'current' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                      className={`px-4 py-2 rounded-md flex items-center ${selectedRound === 'current' ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                      style={{ backgroundColor: selectedRound === 'current' ? theme.primary : theme.background }}
                     >
                       Show Current Status
                     </button>
                     {selectedRound === 'current' && (
                       <div className="mt-4">
-                        <h4 className="font-semibold text-gray-800 mt-2">Current Company Overview:</h4>
-                        <p>Total Shares: {currentEquityData.companyData.totalShares.toLocaleString()}</p>
-                        <p>Total Value: ${currentEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h4 className="font-semibold text-gray-800 mt-2">Current Shareholder Holdings:</h4>
+                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Current Company Overview:</h4>
+                        <p style={{ color: theme.lightText }}>Total Shares: {companyData.totalShares.toLocaleString()}</p>
+                        <p style={{ color: theme.lightText }}>Total Value: ${companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Current Shareholder Holdings:</h4>
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                            <thead style={{ backgroundColor: theme.background }}>
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Value</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Percentage</th>
                               </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
                               {currentEquityData.shareholderData.map(sh => (
                                 <tr key={sh.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{sh.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.totalShares.toLocaleString()}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>
                                     {((sh.totalShares / currentEquityData.companyData.totalShares) * 100).toFixed(2)}%
                                   </td>
                                 </tr>
@@ -1661,15 +1929,16 @@ const EquityManagementApp = () => {
                     )}
                   </div>
 
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Historical Rounds Analysis</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Historical Rounds Analysis</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
                       Analyze equity distribution and valuation at specific past issuance rounds.
                     </p>
                     <select
                       value={selectedRound}
                       onChange={(e) => setSelectedRound(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                      className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 mb-4"
+                      style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                     >
                       <option value="current">Select a Round...</option>
                       {uniqueRounds.map(round => (
@@ -1678,27 +1947,27 @@ const EquityManagementApp = () => {
                     </select>
                     {selectedRound !== 'current' && selectedRound !== '' && (
                       <div className="mt-4">
-                        <h4 className="font-semibold text-gray-800 mt-2">Equity Status at {selectedRound}:</h4>
-                        <p>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
-                        <p>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h4 className="font-semibold text-gray-800 mt-2">Shareholder Holdings at {selectedRound}:</h4>
+                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Equity Status at {selectedRound}:</h4>
+                        <p style={{ color: theme.lightText }}>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
+                        <p style={{ color: theme.lightText }}>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Shareholder Holdings at {selectedRound}:</h4>
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                            <thead style={{ backgroundColor: theme.background }}>
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Value</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Percentage</th>
                               </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
                               {displayEquityData.shareholderData.map(sh => (
                                 <tr key={sh.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.totalShares.toLocaleString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{sh.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.totalShares.toLocaleString()}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>
                                     {((sh.totalShares / displayEquityData.companyData.totalShares) * 100).toFixed(2)}%
                                   </td>
                                 </tr>
@@ -1710,18 +1979,19 @@ const EquityManagementApp = () => {
                     )}
                   </div>
 
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Future Scenario Planning</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Future Scenario Planning</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
                       Input a hypothetical future issuance to see its impact on current equity distribution.
                     </p>
                     <form onSubmit={handleCalculateFutureScenario} className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder for Future Issuance</label>
+                        <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Shareholder for Future Issuance</label>
                         <select
                           value={futureIssuanceData.shareholderId}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareholderId: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           required
                         >
                           <option value="">Select Shareholder</option>
@@ -1731,11 +2001,12 @@ const EquityManagementApp = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Share Class for Future Issuance</label>
+                        <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Share Class for Future Issuance</label>
                         <select
                           value={futureIssuanceData.shareClassId}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareClassId: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           required
                         >
                           <option value="">Select Share Class</option>
@@ -1745,41 +2016,45 @@ const EquityManagementApp = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Shares (Future Issuance)</label>
+                        <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Shares (Future Issuance)</label>
                         <input
                           type="number"
                           value={futureIssuanceData.shares}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shares: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           min="1"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-sm text-gray-700 mb-1">Price per Share ($) (Future Issuance)</label>
+                        <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Price per Share ($) (Future Issuance)</label>
                         <input
                           type="number"
                           step="0.01"
                           value={futureIssuanceData.pricePerShare}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, pricePerShare: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           min="0"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date (Future Issuance)</label>
+                        <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Issue Date (Future Issuance)</label>
                         <input
                           type="date"
                           value={futureIssuanceData.issueDate}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, issueDate: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           required
                         />
                       </div>
                       <button
                         type="submit"
-                        className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
+                        className="text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                        style={{ backgroundColor: theme.primary }}
                         disabled={loading}
                       >
                         {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -1787,28 +2062,28 @@ const EquityManagementApp = () => {
                       </button>
                     </form>
                     {futureScenarioResults && (
-                      <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-3">Future Scenario Results:</h4>
-                        <p>Total Shares (Future): {futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
-                        <p>Total Value (Future): ${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h5 className="font-semibold text-gray-800 mt-3">Shareholder Impact:</h5>
+                      <div className="mt-6 p-4 rounded-lg border" style={{ backgroundColor: theme.background, borderColor: theme.borderColor }}>
+                        <h4 className="text-lg font-semibold mb-3" style={{ color: theme.text }}>Future Scenario Results:</h4>
+                        <p style={{ color: theme.lightText }}>Total Shares (Future): {futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
+                        <p style={{ color: theme.lightText }}>Total Value (Future): ${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                        <h5 className="font-semibold mt-3" style={{ color: theme.text }}>Shareholder Impact:</h5>
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                            <thead style={{ backgroundColor: theme.cardBackground }}>
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current %</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Future %</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Change</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Current %</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Future %</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>% Change</th>
                               </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
                               {futureScenarioResults.future_state.shareholderSummary.map(sh => (
                                 <tr key={sh.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sh.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.currentPercentage.toFixed(2)}%</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.futurePercentage.toFixed(2)}%</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sh.percentageChange.toFixed(2)}%</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{sh.name}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.currentPercentage.toFixed(2)}%</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.futurePercentage.toFixed(2)}%</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.percentageChange.toFixed(2)}%</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1818,27 +2093,29 @@ const EquityManagementApp = () => {
                     )}
                   </div>
 
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Company Profile Report (PDF)</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Company Profile Report (PDF)</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
                       Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
                     </p>
                     <button
                       onClick={handleDownloadPdf}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
+                      className="bg-purple-600 text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                      style={{ backgroundColor: theme.primary }}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download Company Profile PDF
                     </button>
                   </div>
-                  <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Shareholders Data (CSV)</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Shareholders Data (CSV)</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
                       Download a CSV file containing all shareholder details for the selected company.
                     </p>
                     <button
                       onClick={handleDownloadCsv}
-                      className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700 flex items-center"
+                      className="bg-teal-600 text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                      style={{ backgroundColor: theme.secondary }}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download Shareholders CSV
@@ -1849,16 +2126,17 @@ const EquityManagementApp = () => {
 
               {activeTab === 'account' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">My Account</h2>
-                  <div className="mb-6 border-b border-gray-200">
+                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>My Account</h2>
+                  <div className="mb-6 border-b" style={{ borderColor: theme.borderColor }}>
                     <nav className="-mb-px flex space-x-8">
                       <button
                         onClick={() => setMyAccountSubTab('profile')}
                         className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                           myAccountSubTab === 'profile'
-                            ? 'border-blue-500 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'text-blue-600'
+                            : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
+                        style={{ borderColor: myAccountSubTab === 'profile' ? theme.primary : 'transparent', color: myAccountSubTab === 'profile' ? theme.primary : theme.lightText }}
                       >
                         Profile
                       </button>
@@ -1866,9 +2144,10 @@ const EquityManagementApp = () => {
                         onClick={() => setMyAccountSubTab('loginDetails')}
                         className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                           myAccountSubTab === 'loginDetails'
-                            ? 'border-blue-500 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'text-blue-600'
+                            : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
+                        style={{ borderColor: myAccountSubTab === 'loginDetails' ? theme.primary : 'transparent', color: myAccountSubTab === 'loginDetails' ? theme.primary : theme.lightText }}
                       >
                         Login Details
                       </button>
@@ -1894,6 +2173,30 @@ const EquityManagementApp = () => {
                       setErrorMessage={setErrorMessage}
                     />
                   )}
+                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
+                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Subscription Status</h3>
+                    <p className="text-sm" style={{ color: theme.lightText }}>
+                      Current Status: <span className={`font-semibold ${isPremiumUser ? 'text-green-600' : 'text-red-600'}`}>
+                        {userProfile?.subscription_status ? userProfile.subscription_status.toUpperCase() : 'FREE'}
+                      </span>
+                    </p>
+                    {!isPremiumUser && (
+                      <button
+                        onClick={handleCheckout}
+                        className="mt-4 text-white px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+                        style={{ backgroundColor: theme.primary }}
+                        disabled={loading}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Upgrade to Premium
+                      </button>
+                    )}
+                    {isPremiumUser && (
+                      <p className="text-sm" style={{ color: theme.lightText }}>
+                        You have access to all premium features.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2269,13 +2572,13 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Issuance Round (e.g., Seed, Series A)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Issuance Round</label>
           <input
             type="text"
             value={data.round}
             onChange={(e) => setData({...data, round: e.target.value})}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., Seed, Series A, Round 1"
+            placeholder="e.g., Seed, Series A"
           />
         </div>
       </div>
@@ -2346,7 +2649,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
   return (
     <form onSubmit={handleSubmitAll}>
       {issuances.map((issuance, index) => (
-        <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md relative">
+        <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md">
           <h4 className="text-md font-medium text-gray-800 mb-3">Issuance #{index + 1}</h4>
           {issuances.length > 1 && (
             <button
@@ -2711,6 +3014,37 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
         </div>
         <p className="text-xs text-gray-500 mt-2">
           *Note: Deactivating changes your email and status. Deleting removes your data. The core authentication record in Supabase `auth.users` cannot be deleted directly from the client-side for security reasons.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// SubscriptionPage Component
+const SubscriptionPage = ({ user, handleCheckout, loading, errorMessage }) => {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
+        <CreditCard className="mx-auto h-16 w-16 text-blue-600 mb-4" />
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">Unlock Premium Features</h2>
+        <p className="text-gray-700 mb-6">
+          Upgrade to our Premium Plan to access all advanced reports, scenario planning, and unlimited company management.
+        </p>
+        {errorMessage && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span className="block sm:inline">{errorMessage}</span>
+          </div>
+        )}
+        <button
+          onClick={handleCheckout}
+          className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center text-lg font-semibold"
+          disabled={loading}
+        >
+          {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+          Subscribe Now
+        </button>
+        <p className="text-sm text-gray-500 mt-4">
+          You will be redirected to your WooCommerce site to complete the subscription.
         </p>
       </div>
     </div>
