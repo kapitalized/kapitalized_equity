@@ -1515,7 +1515,7 @@ const EquityManagementApp = () => {
       <div className={`bg-white shadow-md transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-64'} h-screen flex flex-col`}>
         <div className="flex items-center justify-between p-4 border-b">
           {!isSidebarCollapsed && (
-            <img src="https://placehold.co/150x40/transparent/white?text=KAP+Logo" alt="KAP Logo" className="h-10" />
+            <img src="https://kapitalized.com/wp-content/uploads/KAP-Logo-150px.webp" alt="Kapitalized Logo" className="h-10" />
           )}
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
