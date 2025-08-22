@@ -172,4 +172,173 @@ const AdminDashboard = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Share Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          );
+        default:
+          return null;
+      }
+    };
+
+    const renderTableRows = () => {
+      return currentData.map((item, index) => {
+        switch (activeTab) {
+          case 'companies':
+            return (
+              <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.industry}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.founded}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.employees}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    item.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {item.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div className="flex space-x-2">
+                    <button className="text-blue-600 hover:text-blue-900"><Eye size={16} /></button>
+                    <button className="text-green-600 hover:text-green-900"><Edit size={16} /></button>
+                    <button className="text-red-600 hover:text-red-900"><Trash2 size={16} /></button>
+                  </div>
+                </td>
+              </tr>
+            );
+          case 'users':
+            return (
+              <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.role}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.company}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.joinDate}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div className="flex space-x-2">
+                    <button className="text-blue-600 hover:text-blue-900"><Eye size={16} /></button>
+                    <button className="text-green-600 hover:text-green-900"><Edit size={16} /></button>
+                    <button className="text-red-600 hover:text-red-900"><Trash2 size={16} /></button>
+                  </div>
+                </td>
+              </tr>
+            );
+          case 'shares':
+            return (
+              <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.userName}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.company}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.shareType}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.quantity?.toLocaleString()}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.issueDate}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div className="flex space-x-2">
+                    <button className="text-blue-600 hover:text-blue-900"><Eye size={16} /></button>
+                    <button className="text-green-600 hover:text-green-900"><Edit size={16} /></button>
+                    <button className="text-red-600 hover:text-red-900"><Trash2 size={16} /></button>
+                  </div>
+                </td>
+              </tr>
+            );
+          default:
+            return null;
+        }
+      });
+    };
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead>
+            {renderTableHeaders()}
+          </thead>
+          <tbody>
+            {renderTableRows()}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600">Manage companies, users, and share issuances</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                      activeTab === tab.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <Icon size={16} />
+                    {tab.label}
+                    <span className="bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder={`Search ${activeTab}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <select
+              value={filterCriteria}
+              onChange={(e) => setFilterCriteria(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All {activeTab}</option>
+              {getFilterOptions().map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+              <Plus size={16} />
+              Add {activeTab.slice(0, -1)}
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="bg-white rounded-lg shadow">
+          {renderTable()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;
