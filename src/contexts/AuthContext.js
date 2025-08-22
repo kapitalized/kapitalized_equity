@@ -22,7 +22,48 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check for existing session
+    const handleUserSession = async (authUser) => {
+      try {
+        // Get user details from your users table
+        const { data: userData, error } = await supabase
+          .from('user_profiles')
+          .select(`*`) // Simplified the query to remove the non-existent 'companies' join
+          .eq('id', authUser.id)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') { // User doesn't exist, create them
+            const { data: newUser, error: createError } = await supabase
+              .from('user_profiles')
+              .insert({
+                id: authUser.id,
+                email: authUser.email,
+                name: authUser.user_metadata?.name || authUser.email,
+                role: 'user', // Default role
+                created_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+
+            if (createError) {
+              console.error('Error creating user:', createError);
+              return;
+            }
+            setUser({ ...authUser, ...newUser });
+          } else {
+            console.error('Error fetching user data:', error);
+            return;
+          }
+        } else {
+          setUser({ ...authUser, ...userData });
+        }
+
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Error handling user session:', error);
+      }
+    };
+
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -38,7 +79,6 @@ export const AuthProvider = ({ children }) => {
 
     checkSession();
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
@@ -53,56 +93,6 @@ export const AuthProvider = ({ children }) => {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const handleUserSession = async (authUser) => {
-    try {
-      // Get user details from your users table
-      const { data: userData, error } = await supabase
-        .from('user_profiles')
-        .select(`
-          *,
-          companies (
-            id,
-            name
-          )
-        `)
-        .eq('id', authUser.id)
-        .single();
-
-      if (error) {
-        // If user doesn't exist in users table, create them
-        if (error.code === 'PGRST116') {
-          const { data: newUser, error: createError } = await supabase
-            .from('user_profiles')
-            .insert({
-              id: authUser.id,
-              email: authUser.email,
-              name: authUser.user_metadata?.name || authUser.email,
-              role: 'user', // Default role
-              created_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('Error creating user:', createError);
-            return;
-          }
-
-          setUser({ ...authUser, ...newUser });
-        } else {
-          console.error('Error fetching user data:', error);
-          return;
-        }
-      } else {
-        setUser({ ...authUser, ...userData });
-      }
-
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Error handling user session:', error);
-    }
-  };
 
   const signIn = async (email, password) => {
     try {
@@ -153,7 +143,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         throw error;
       }
