@@ -1,230 +1,162 @@
-# api/equity-calculator.py
-
 import os
-import json
 import pandas as pd
 from datetime import datetime
 from supabase import create_client, Client
-import traceback
-from urllib.parse import urlparse, parse_qs
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
-# Supabase client initialization
+# --- Configuration and Initialization ---
+
+# Initialize FastAPI app
+app = FastAPI()
+
+# Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("CRITICAL: Supabase environment variables not set.")
+    supabase = None
 else:
-    print("Error: Supabase URL or Key environment variables are not set for the backend.")
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- Helper function for equity calculations ---
-def calculate_equity_snapshot(issuances_data, shareholders_data, share_classes_data):
-    """
-    Calculates equity metrics (total shares, value, percentages) from raw data.
-    """
-    if not issuances_data or not shareholders_data or not share_classes_data:
-        return {
-            "totalShares": 0, "totalValue": 0, "classSummary": [],
-            "shareholderSummary": [], "latestValuationPerShare": 0, "companyValuation": 0
-        }
+# --- Pydantic Models for Data Validation ---
+# These models ensure that the data sent from the frontend is in the correct format.
+
+class Shareholder(BaseModel):
+    id: int
+    name: str
+    email: Optional[str] = None
+    type: Optional[str] = None
+
+class ShareClass(BaseModel):
+    id: int
+    name: str
+    priority: int
+
+class Issuance(BaseModel):
+    id: int
+    shareholder_id: int
+    share_class_id: int
+    shares: int
+    price_per_share: float
+    issue_date: str
+    round: Optional[str] = None
+    created_at: Optional[str] = None
+
+class FutureIssuance(BaseModel):
+    shareholderId: int
+    shareClassId: int
+    shares: int
+    pricePerShare: float
+    issueDate: str
+    round: Optional[str] = 'Future Scenario'
+
+class CalculationPayload(BaseModel):
+    companyId: int
+    currentIssuances: List[Issuance]
+    shareholders: List[Shareholder]
+    shareClasses: List[ShareClass]
+    futureIssuance: Optional[FutureIssuance] = None
+
+# --- Core Calculation Logic (Refactored) ---
+
+def calculate_equity_snapshot(issuances_data: List[dict], shareholders_data: List[dict], share_classes_data: List[dict]):
+    """Calculates a snapshot of equity distribution."""
+    if not all([issuances_data, shareholders_data, share_classes_data]):
+        return {"totalShares": 0, "totalValue": 0, "shareholderSummary": []}
 
     df_issuances = pd.DataFrame(issuances_data)
-    df_issuances['shares'] = pd.to_numeric(df_issuances['shares'])
-    df_issuances['price_per_share'] = pd.to_numeric(df_issuances['price_per_share'])
-    df_issuances['shareholder_id'] = pd.to_numeric(df_issuances['shareholder_id'])
-    df_issuances['share_class_id'] = pd.to_numeric(df_issuances['share_class_id'])
-    
     df_shareholders = pd.DataFrame(shareholders_data)
-    df_shareholders['id'] = pd.to_numeric(df_shareholders['id'])
-
     df_share_classes = pd.DataFrame(share_classes_data)
-    df_share_classes['id'] = pd.to_numeric(df_share_classes['id'])
+
+    # Ensure correct data types
+    for df in [df_issuances, df_shareholders, df_share_classes]:
+        for col in ['id', 'shareholder_id', 'share_class_id']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col])
 
     df_issuances['value'] = df_issuances['shares'] * df_issuances['price_per_share']
     total_shares = df_issuances['shares'].sum()
     total_value = df_issuances['value'].sum()
 
-    latest_valuation_per_share = 0
-    if not df_issuances.empty:
-        df_issuances['issue_date'] = pd.to_datetime(df_issuances['issue_date'])
-        sort_keys = ['issue_date']
-        if 'created_at' in df_issuances.columns:
-            sort_keys.append('created_at')
-        df_issuances = df_issuances.sort_values(by=sort_keys, ascending=False, kind='mergesort')
-        latest_valuation_per_share = df_issuances.iloc[0]['price_per_share']
-    
-    company_valuation = total_shares * latest_valuation_per_share
-
-    class_summary_raw = df_issuances.groupby('share_class_id').agg(
+    # Create shareholder summary
+    summary = df_issuances.groupby('shareholder_id').agg(
         totalShares=('shares', 'sum'),
         totalValue=('value', 'sum')
     ).reset_index()
 
-    class_summary = []
-    for _, row in class_summary_raw.iterrows():
-        share_class_match = df_share_classes[df_share_classes['id'] == row['share_class_id']]
-        if not share_class_match.empty:
-            share_class = share_class_match.iloc[0].to_dict()
-            percentage = (row['totalShares'] / total_shares * 100) if total_shares > 0 else 0
-            issuances_for_class = df_issuances[df_issuances['share_class_id'] == row['share_class_id']]
-            round_name = issuances_for_class['round'].iloc[0] if not issuances_for_class.empty else 'N/A'
-            class_summary.append({
-                "id": int(share_class['id']), "name": share_class.get('name'),
-                "priority": int(share_class.get('priority', 99)), "totalShares": int(row['totalShares']),
-                "totalValue": float(row['totalValue']), "percentage": round(percentage, 2),
-                "round": round_name
-            })
-    class_summary = sorted(class_summary, key=lambda x: x['priority'])
+    summary = summary.merge(df_shareholders[['id', 'name']], left_on='shareholder_id', right_on='id')
 
-    shareholder_summary = []
-    shareholder_groups = df_issuances.groupby('shareholder_id')
-    for shareholder_id, group in shareholder_groups:
-        shareholder_match = df_shareholders[df_shareholders['id'] == shareholder_id]
-        if not shareholder_match.empty:
-            shareholder = shareholder_match.iloc[0].to_dict()
-            total_shares_sh = group['shares'].sum()
-            total_value_sh = group['value'].sum()
-            holdings = []
-            for _, issuance_row in group.iterrows():
-                issuance = issuance_row.to_dict()
-                share_class_match = df_share_classes[df_share_classes['id'] == issuance['share_class_id']]
-                share_class_name = share_class_match.iloc[0]['name'] if not share_class_match.empty else 'Unknown'
-                holdings.append({
-                    "id": int(issuance['id']), "shares": int(issuance['shares']),
-                    "price_per_share": float(issuance['price_per_share']),
-                    "issue_date": issuance['issue_date'].strftime('%Y-%m-%d'),
-                    "shareClassName": share_class_name, "valuation": float(issuance['value']),
-                    "round": issuance.get('round')
-                })
-            shareholder_summary.append({
-                "id": int(shareholder['id']), "name": shareholder.get('name'),
-                "email": shareholder.get('email'), "type": shareholder.get('type'),
-                "totalShares": int(total_shares_sh), "totalValue": float(total_value_sh),
-                "holdings": holdings
-            })
-    shareholder_summary = sorted(shareholder_summary, key=lambda x: x['totalShares'], reverse=True)
+    if total_shares > 0:
+        summary['percentage'] = (summary['totalShares'] / total_shares) * 100
+    else:
+        summary['percentage'] = 0
 
     return {
-        "totalShares": int(total_shares), "totalValue": float(total_value),
-        "classSummary": class_summary, "shareholderSummary": shareholder_summary,
-        "latestValuationPerShare": float(latest_valuation_per_share),
-        "companyValuation": float(company_valuation)
+        "totalShares": int(total_shares),
+        "totalValue": float(total_value),
+        "shareholderSummary": summary.to_dict('records')
     }
 
-# --- Vercel Serverless Function Handler ---
-def handler(request, context=None):
-    if request.method == 'OPTIONS':
-        return '', 204, {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, DELETE, PUT, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Max-Age': '3600'
-        }
-    
-    headers = {'Access-Control-Allow-Origin': '*'}
+# --- API Endpoints ---
 
+@app.post("/api/equity-calculator")
+async def get_equity_calculation(payload: CalculationPayload):
+    """Endpoint to calculate current and future equity scenarios."""
     try:
-        if supabase is None:
-            return {"error": "Supabase client not initialized"}, 500, headers
+        current_issuances_dict = [issuance.dict() for issuance in payload.currentIssuances]
+        shareholders_dict = [sh.dict() for sh in payload.shareholders]
+        share_classes_dict = [sc.dict() for sc in payload.shareClasses]
 
-        # --- FIX: Robust routing for all request types within the single handler ---
-        parsed_url = urlparse(request.url)
-        query_params = parse_qs(parsed_url.query)
+        current_state = calculate_equity_snapshot(current_issuances_dict, shareholders_dict, share_classes_dict)
+        future_state = None
 
-        # Admin GET requests for listing entities
-        if request.method == 'GET' and 'entity' in query_params:
-            entity = query_params['entity'][0]
-            if entity == 'users':
-                response = supabase.from_('user_profiles').select('*').execute()
-                return response.data, 200, headers
-            elif entity == 'companies':
-                response = supabase.from_('companies').select('*').execute()
-                return response.data, 200, headers
-            elif entity == 'issuances':
-                response = supabase.from_('share_issuances').select('*').execute()
-                return response.data, 200, headers
-            else:
-                return {"error": "Invalid entity for GET request"}, 400, headers
+        if payload.futureIssuance:
+            future_issuance_dict = payload.futureIssuance.dict(by_alias=True)
+            # Map frontend camelCase to Python snake_case
+            future_issuance_dict['shareholder_id'] = future_issuance_dict.pop('shareholderId')
+            future_issuance_dict['share_class_id'] = future_issuance_dict.pop('shareClassId')
+            future_issuance_dict['price_per_share'] = future_issuance_dict.pop('pricePerShare')
+            future_issuance_dict['issue_date'] = future_issuance_dict.pop('issueDate')
+            future_issuance_dict['id'] = 999999 # Dummy ID for calculation
 
-        # Admin DELETE requests
-        elif request.method == 'DELETE':
-            data = request.get_json()
-            item_id = data.get('id')
-            item_type = data.get('type')
-            if not item_id or not item_type:
-                return {"error": "id and type are required for deletion"}, 400, headers
-            
-            if item_type == 'user':
-                # This requires the admin client, which we are using via the service key
-                auth_response = supabase.auth.admin.delete_user(item_id)
-                # Successful deletion might not return a user object, check for error instead
-                if hasattr(auth_response, 'error') and auth_response.error is not None:
-                     return {"error": f"Failed to delete user {item_id}: {auth_response.error.message}"}, 500, headers
-                return {"message": f"User {item_id} and associated data deleted."}, 200, headers
-            elif item_type == 'company':
-                supabase.from_('companies').delete().eq('id', item_id).execute()
-                return {"message": f"Company {item_id} and associated data deleted."}, 200, headers
-            elif item_type == 'issuance':
-                supabase.from_('share_issuances').delete().eq('id', item_id).execute()
-                return {"message": f"Issuance {item_id} deleted."}, 200, headers
-            else:
-                return {"error": "Invalid item type for deletion"}, 400, headers
-        
-        # POST request for equity calculation
-        elif request.method == 'POST':
-            data = request.get_json()
-            if 'companyId' in data: # This identifies it as a calculation request
-                current_issuances = data.get('currentIssuances', [])
-                shareholders = data.get('shareholders', [])
-                share_classes = data.get('shareClasses', [])
-                future_issuance = data.get('futureIssuance')
-                
-                current_state_data = calculate_equity_snapshot(current_issuances, shareholders, share_classes)
-                future_state_data = None
+            all_issuances = current_issuances_dict + [future_issuance_dict]
+            future_state = calculate_equity_snapshot(all_issuances, shareholders_dict, share_classes_dict)
 
-                if future_issuance:
-                    future_issuances = list(current_issuances)
-                    try:
-                        future_issuance_processed = {
-                            "id": f"future_{datetime.now().timestamp()}", "company_id": data.get('companyId'),
-                            "shareholder_id": int(future_issuance.get('shareholderId')),
-                            "share_class_id": int(future_issuance.get('shareClassId')),
-                            "shares": int(future_issuance.get('shares')),
-                            "price_per_share": float(future_issuance.get('pricePerShare')),
-                            "issue_date": future_issuance.get('issueDate'),
-                            "round": future_issuance.get('round') or 'Future Scenario',
-                            "created_at": datetime.now().isoformat()
-                        }
-                    except (ValueError, TypeError) as e:
-                        return {"error": f"Invalid or missing data in future issuance form: {e}"}, 400, headers
+            # Add comparison percentages
+            current_percentages = {sh['id']: sh['percentage'] for sh in current_state['shareholderSummary']}
+            for future_sh in future_state['shareholderSummary']:
+                current_perc = current_percentages.get(future_sh['id'], 0)
+                future_sh['currentPercentage'] = round(current_perc, 2)
+                future_sh['futurePercentage'] = round(future_sh['percentage'], 2)
+                future_sh['percentageChange'] = round(future_sh['percentage'] - current_perc, 2)
 
-                    future_issuances.append(future_issuance_processed)
-                    future_state_data = calculate_equity_snapshot(future_issuances, shareholders, share_classes)
-
-                    current_shareholder_percentages = {
-                        sh['id']: (sh['totalShares'] / current_state_data['totalShares'] * 100) if current_state_data['totalShares'] > 0 else 0
-                        for sh in current_state_data['shareholderSummary']
-                    }
-
-                    for sh_future in future_state_data.get('shareholderSummary', []):
-                        current_percentage = current_shareholder_percentages.get(sh_future['id'], 0)
-                        future_percentage = (sh_future['totalShares'] / future_state_data['totalShares'] * 100) if future_state_data['totalShares'] > 0 else 0
-                        sh_future['percentageChange'] = round(future_percentage - current_percentage, 2)
-                        sh_future['currentPercentage'] = round(current_percentage, 2)
-                        sh_future['futurePercentage'] = round(future_percentage, 2)
-
-                response_data = {
-                    "current_state": current_state_data,
-                    "future_state": future_state_data
-                }
-                return response_data, 200, headers
-        
-        return {"error": "Endpoint not found or method not supported"}, 404, headers
+        return {"current_state": current_state, "future_state": future_state}
 
     except Exception as e:
-        print(f"Error in handler: {e}")
-        traceback.print_exc()
-        return {"error": f"A server error occurred: {str(e)}"}, 500, headers
-    
-    return {"error": "Method Not Allowed"}, 405, headers
+        raise HTTPException(status_code=500, detail=f"An error occurred during calculation: {e}")
+
+@app.get("/api/admin/{entity}")
+async def get_admin_data(entity: str):
+    """Endpoint to fetch all data for the admin panel."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+
+    table_map = {
+        "users": "user_profiles",
+        "companies": "companies",
+        "issuances": "share_issuances"
+    }
+    if entity not in table_map:
+        raise HTTPException(status_code=404, detail="Entity not found.")
+
+    try:
+        response = supabase.from_(table_map[entity]).select('*').execute()
+        return response.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch {entity}: {e}")
+
+# This allows Vercel to run the FastAPI app
+handler = app
