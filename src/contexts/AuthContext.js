@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // Get user details from your users table
       const { data: userData, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .select(`
           *,
           companies (
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
         // If user doesn't exist in users table, create them
         if (error.code === 'PGRST116') {
           const { data: newUser, error: createError } = await supabase
-            .from('users')
+            .from('user_profiles')
             .insert({
               id: authUser.id,
               email: authUser.email,
@@ -170,7 +170,7 @@ export const AuthProvider = ({ children }) => {
   const updateUserProfile = async (updates) => {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('user_profiles')
         .update(updates)
         .eq('id', user.id)
         .select()
