@@ -41,36 +41,38 @@ const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
   const [currentView, setCurrentView] = useState('users'); // 'users', 'companies', or 'issuances'
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchAllAdminData = async () => {
-    setLoadingAdminData(true);
-    setErrorMessage('');
-    try {
-      // Fetch all data types in parallel for efficiency
-      const [usersResponse, companiesResponse, issuancesResponse] = await Promise.all([
-        fetch(`${PYTHON_BACKEND_URL}?entity=users`),
-        fetch(`${PYTHON_BACKEND_URL}?entity=companies`),
-        fetch(`${PYTHON_BACKEND_URL}?entity=issuances`)
-      ]);
+// Inside the AdminDashboard component in App.js
 
-      if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
-      const usersData = await usersResponse.json();
-      setAllUsers(usersData);
+const fetchAllAdminData = async () => {
+  setLoadingAdminData(true);
+  setErrorMessage('');
+  try {
+    // Fetch all data types in parallel with the new API routes
+    const [usersResponse, companiesResponse, issuancesResponse] = await Promise.all([
+      fetch(`${PYTHON_BACKEND_URL}/admin/users`),
+      fetch(`${PYTHON_BACKEND_URL}/admin/companies`),
+      fetch(`${PYTHON_BACKEND_URL}/admin/issuances`)
+    ]);
 
-      if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
-      const companiesData = await companiesResponse.json();
-      setAllCompanies(companiesData);
+    if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
+    const usersData = await usersResponse.json();
+    setAllUsers(usersData);
 
-      if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
-      const issuancesData = await issuancesResponse.json();
-      setAllIssuances(issuancesData);
+    if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
+    const companiesData = await companiesResponse.json();
+    setAllCompanies(companiesData);
 
-    } catch (error) {
-      console.error("Error fetching admin data:", error);
-      setErrorMessage('Failed to fetch admin data: ' + error.message);
-    } finally {
-      setLoadingAdminData(false);
-    }
-  };
+    if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
+    const issuancesData = await issuancesResponse.json();
+    setAllIssuances(issuancesData);
+
+  } catch (error) {
+    console.error("Error fetching admin data:", error);
+    setErrorMessage('Failed to fetch admin data: ' + error.message);
+  } finally {
+    setLoadingAdminData(false);
+  }
+};
 
   useEffect(() => {
     fetchAllAdminData();
