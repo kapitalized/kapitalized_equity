@@ -1,3 +1,5 @@
-supabase # Corrected package name
+supabase
 pandas
-Flask
+fastapi
+uvicorn[standard]
+pydantic
