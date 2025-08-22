@@ -1,6 +1,3 @@
-## Step 5: Create `src/components/Dashboard.js`
-
-```javascript
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Building, Users, Share, TrendingUp } from 'lucide-react';
