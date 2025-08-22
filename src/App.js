@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard } from 'lucide-react';
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
-// REMOVED: import { createClient } from '@supabase/supabase-js'; // THIS LINE IS NOW REMOVED
-
 
 // IMPORTANT: Replace with the URL of your Vercel Serverless Function
 const PYTHON_BACKEND_URL = "/api/equity-calculator";
@@ -34,37 +32,34 @@ if (typeof window !== 'undefined' && window.supabase) { // Ensure window.supabas
 }
 
 
-// AdminDashboard Component (Consolidated directly into App.js)
+// --- FIX: AdminDashboard Component Overhauled for Better UI and Filtering ---
 const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
   const [loadingAdminData, setLoadingAdminData] = useState(true);
   const [allUsers, setAllUsers] = useState([]);
   const [allCompanies, setAllCompanies] = useState([]);
   const [allIssuances, setAllIssuances] = useState([]);
+  const [currentView, setCurrentView] = useState('users'); // 'users', 'companies', or 'issuances'
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAllAdminData = async () => {
     setLoadingAdminData(true);
     setErrorMessage('');
     try {
-      const usersResponse = await fetch(`${PYTHON_BACKEND_URL}/admin/users`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      // Fetch all data types in parallel for efficiency
+      const [usersResponse, companiesResponse, issuancesResponse] = await Promise.all([
+        fetch(`${PYTHON_BACKEND_URL}?entity=users`),
+        fetch(`${PYTHON_BACKEND_URL}?entity=companies`),
+        fetch(`${PYTHON_BACKEND_URL}?entity=issuances`)
+      ]);
+
       if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
       const usersData = await usersResponse.json();
       setAllUsers(usersData);
 
-      const companiesResponse = await fetch(`${PYTHON_BACKEND_URL}/admin/companies`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
       if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
       const companiesData = await companiesResponse.json();
       setAllCompanies(companiesData);
 
-      const issuancesResponse = await fetch(`${PYTHON_BACKEND_URL}/admin/issuances`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
       if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
       const issuancesData = await issuancesResponse.json();
       setAllIssuances(issuancesData);
@@ -88,18 +83,18 @@ const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
     setLoadingAdminData(true);
     setErrorMessage('');
     try {
-      const response = await fetch(`${PYTHON_BACKEND_URL}/admin/delete`, {
+      const response = await fetch(PYTHON_BACKEND_URL, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, type }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorData.error}`);
       }
       alert(`${type} deleted successfully!`);
-      fetchAllAdminData();
+      fetchAllAdminData(); // Refresh data after deletion
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
       setErrorMessage(`Failed to delete ${type}: ` + error.message);
@@ -107,6 +102,22 @@ const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
       setLoadingAdminData(false);
     }
   };
+
+  const filteredUsers = allUsers.filter(user =>
+    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
+
+  const filteredCompanies = allCompanies.filter(company =>
+    (company.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (company.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
+
+  const filteredIssuances = allIssuances.filter(issuance =>
+    (issuance.round?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    issuance.shares.toString().includes(searchTerm)
+  );
 
   if (loadingAdminData) {
     return (
@@ -118,111 +129,143 @@ const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
   }
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Admin Dashboard</h2>
-
-      <div className="bg-white shadow rounded-lg p-6" style={{ backgroundColor: theme.cardBackground }}>
-        <h3 className="text-xl font-medium" style={{ color: theme.text }}>All Users</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-            <thead style={{ backgroundColor: theme.background }}>
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Username</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Full Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Is Admin</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-              {allUsers.map(user => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={user.id}>{user.id.substring(0, 8)}...</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.username || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.full_name || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.status}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.is_admin ? 'Yes' : 'No'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => handleAdminDelete(user.id, 'user')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Admin Dashboard</h2>
+        <div className="flex items-center space-x-2">
+          <button onClick={() => setCurrentView('users')} className={`px-4 py-2 text-sm font-medium rounded-md ${currentView === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Users</button>
+          <button onClick={() => setCurrentView('companies')} className={`px-4 py-2 text-sm font-medium rounded-md ${currentView === 'companies' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Companies</button>
+          <button onClick={() => setCurrentView('issuances')} className={`px-4 py-2 text-sm font-medium rounded-md ${currentView === 'issuances' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Issuances</button>
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-6" style={{ backgroundColor: theme.cardBackground }}>
-        <h3 className="text-xl font-medium" style={{ color: theme.text }}>All Companies</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-            <thead style={{ backgroundColor: theme.background }}>
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Owner User ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-              {allCompanies.map(company => (
-                <tr key={company.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.id}>{company.id.substring(0, 8)}...</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.description || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.user_id}>{company.user_id.substring(0, 8)}...</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => handleAdminDelete(company.id, 'company')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder={`Filter ${currentView}...`}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ borderColor: theme.borderColor }}
+        />
       </div>
 
       <div className="bg-white shadow rounded-lg p-6" style={{ backgroundColor: theme.cardBackground }}>
-        <h3 className="text-xl font-medium" style={{ color: theme.text }}>All Share Issuances</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-            <thead style={{ backgroundColor: theme.background }}>
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Company ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shareholder ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Price/Share</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Issue Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-              {allIssuances.map(issuance => (
-                <tr key={issuance.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.id}>{issuance.id.substring(0, 8)}...</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.company_id}>{issuance.company_id.substring(0, 8)}...</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.shareholder_id}>{issuance.shareholder_id.substring(0, 8)}...</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.shares.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${issuance.price_per_share.toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.issue_date}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => handleAdminDelete(issuance.id, 'issuance')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {currentView === 'users' && (
+          <>
+            <h3 className="text-xl font-medium mb-4" style={{ color: theme.text }}>All Users ({filteredUsers.length})</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                {/* Users Table Head */}
+                <thead style={{ backgroundColor: theme.background }}>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Username</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Full Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Is Admin</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
+                  </tr>
+                </thead>
+                {/* Users Table Body */}
+                <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
+                  {filteredUsers.map(user => (
+                    <tr key={user.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={user.id}>{user.id.substring(0, 8)}...</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.username || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.full_name || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.status}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.is_admin ? 'Yes' : 'No'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => handleAdminDelete(user.id, 'user')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {currentView === 'companies' && (
+          <>
+            <h3 className="text-xl font-medium mb-4" style={{ color: theme.text }}>All Companies ({filteredCompanies.length})</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                {/* Companies Table Head */}
+                <thead style={{ backgroundColor: theme.background }}>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Description</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Owner User ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
+                  </tr>
+                </thead>
+                {/* Companies Table Body */}
+                <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
+                  {filteredCompanies.map(company => (
+                    <tr key={company.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.id}>{company.id.substring(0, 8)}...</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.description || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.user_id}>{company.user_id.substring(0, 8)}...</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => handleAdminDelete(company.id, 'company')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {currentView === 'issuances' && (
+          <>
+            <h3 className="text-xl font-medium mb-4" style={{ color: theme.text }}>All Share Issuances ({filteredIssuances.length})</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+                {/* Issuances Table Head */}
+                <thead style={{ backgroundColor: theme.background }}>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Company ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shareholder ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Price/Share</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Issue Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
+                  </tr>
+                </thead>
+                {/* Issuances Table Body */}
+                <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
+                  {filteredIssuances.map(issuance => (
+                    <tr key={issuance.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.id}>{issuance.id.substring(0, 8)}...</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.company_id}>{issuance.company_id.substring(0, 8)}...</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.shareholder_id}>{issuance.shareholder_id.substring(0, 8)}...</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.shares.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${issuance.price_per_share.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.issue_date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => handleAdminDelete(issuance.id, 'issuance')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 };
+// --- END OF FIX ---
 
 
 const EquityManagementApp = () => {
