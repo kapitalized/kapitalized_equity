@@ -22,7 +22,7 @@ const theme = {
 
 // Supabase client initialization
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzIM4InR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
 
 let supabase = null;
 if (typeof window !== 'undefined' && window.supabase) {
@@ -325,9 +325,8 @@ const EquityManagementApp = () => {
     }
   };
   
-  // --- FIX: Added Welcome Screen for new users with no companies ---
   const renderMainContent = () => {
-    if (!selectedCompany && companies.length === 0) {
+    if (!selectedCompany && companies.length === 0 && !loading) {
         return (
             <div className="text-center p-10 bg-white rounded-lg shadow-md">
                 <h2 className="text-2xl font-semibold mb-4" style={{color: theme.text}}>Welcome to Kapitalized Equity!</h2>
@@ -344,12 +343,50 @@ const EquityManagementApp = () => {
         );
     }
     
-    // Original content rendering logic
+    // Original content rendering logic based on activeTab
+    // This part will now only render if a company exists and is selected
+    if (selectedCompany) {
+        switch (activeTab) {
+            case 'equityHome':
+                return <div>Equity Home Content</div>; // Replace with actual component
+            case 'shareholders':
+                return <div>Shareholders Content</div>; // Replace with actual component
+            case 'payments':
+                 return <PaymentsPage userProfile={userProfile} />;
+            case 'account':
+                if (myAccountSubTab === 'loginDetails') {
+                    return <LoginDetailsForm
+                              userEmail={user?.email}
+                              onEmailChange={updateUserEmail}
+                              onPasswordChange={() => {}}
+                              onDeactivateAccount={() => {}}
+                              onDeleteAccount={() => {}}
+                            />;
+                }
+                return <div>Profile Content</div>; // Replace with actual component
+            default:
+                return <div>Select a tab</div>;
+        }
+    }
+    return null; // Return null if no company is selected but companies exist
+  }
+
+  // --- FIX: Corrected main return logic ---
+  if (loading) {
     return (
-        <>
-            {/* All the original tab content */}
-        </>
-    )
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+            <p className="ml-3 text-lg text-gray-700">Loading...</p>
+        </div>
+    );
+  }
+
+  if (!user) { // Show login/signup form if no user is authenticated
+    return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            {/* Login/Signup Form JSX */}
+        </div>
+    );
   }
 
   return (
@@ -385,19 +422,6 @@ const EquityManagementApp = () => {
           
           {renderMainContent()}
           
-          {activeTab === 'payments' && (
-            <PaymentsPage userProfile={userProfile} />
-          )}
-          {activeTab === 'account' && myAccountSubTab === 'loginDetails' && (
-            <LoginDetailsForm
-              userEmail={user?.email}
-              onEmailChange={updateUserEmail}
-              onPasswordChange={() => {}}
-              onDeactivateAccount={() => {}}
-              onDeleteAccount={() => {}}
-            />
-          )}
-          {/* Other tab content */}
         </div>
       </div>
       {showCreateCompany && <Modal onClose={() => setShowCreateCompany(false)}><CompanyForm onSubmit={createCompany} onCancel={() => setShowCreateCompany(false)} /></Modal>}
