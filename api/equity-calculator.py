@@ -77,7 +77,7 @@ def calculate_equity_snapshot(issuances_data: List[dict], shareholders_data: Lis
     for df in [df_issuances, df_shareholders, df_share_classes]:
         for col in ['id', 'shareholder_id', 'share_class_id']:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col])
+                df[col] = pd.to_numeric(df[col], errors='coerce') # Use coerce to handle non-numeric gracefully
 
     df_issuances['value'] = df_issuances['shares'] * df_issuances['price_per_share']
     total_shares = df_issuances['shares'].sum()
@@ -149,7 +149,9 @@ async def get_admin_data(entity: str):
     table_map = {
         "users": "user_profiles",
         "companies": "companies",
-        "issuances": "share_issuances"
+        "issuances": "share_issuances",
+        "shareholders": "shareholders", # Added for completeness
+        "shareclasses": "share_classes", # Added for completeness
     }
     if entity not in table_map:
         raise HTTPException(status_code=404, detail="Entity not found.")
@@ -159,6 +161,49 @@ async def get_admin_data(entity: str):
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch {entity}: {e}")
+
+@app.delete("/api/admin/{entity}/{item_id}")
+async def delete_admin_data(entity: str, item_id: int):
+    """Endpoint to delete data from the admin panel."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+
+    table_map = {
+        "users": "user_profiles",
+        "companies": "companies",
+        "issuances": "share_issuances",
+        "shareholders": "shareholders",
+        "shareclasses": "share_classes",
+    }
+    if entity not in table_map:
+        raise HTTPException(status_code=404, detail="Entity not found.")
+
+    try:
+        # Before deleting a company, delete associated issuances, shareholders, and share classes
+        if entity == "companies":
+            # Delete issuances associated with the company
+            await supabase.from_("share_issuances").delete().eq("company_id", item_id).execute()
+            # Delete shareholders associated with the company
+            await supabase.from_("shareholders").delete().eq("company_id", item_id).execute()
+            # Delete share classes associated with the company
+            await supabase.from_("share_classes").delete().eq("company_id", item_id).execute()
+
+        # Delete the main item
+        response = supabase.from_(table_map[entity]).delete().eq("id", item_id).execute()
+
+        # Supabase delete operation doesn't directly return affected rows in the same way as a typical DB.
+        # Check if an error occurred in the response.
+        if response.data is None and response.count == 0:
+            raise HTTPException(status_code=404, detail=f"No {entity} found with ID {item_id} to delete.")
+
+        return {"message": f"{entity.capitalize()} with ID {item_id} deleted successfully."}
+    except Exception as e:
+        # Supabase client errors might be in response.error
+        error_detail = str(e)
+        if hasattr(response, 'error') and response.error:
+            error_detail = response.error.message
+        raise HTTPException(status_code=500, detail=f"Failed to delete {entity}: {error_detail}")
+
 
 # This allows Vercel to run the FastAPI app
 handler = app
