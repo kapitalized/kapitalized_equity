@@ -283,7 +283,8 @@ const EquityManagementApp = () => {
     shares: '',
     pricePerShare: '',
     issueDate: new Date().toISOString().split('T')[0],
-    round: 'Future Scenario'
+    roundNumber: '', // Changed from round to roundNumber
+    roundTitle: 'Future Scenario' // New field
   });
   const [futureScenarioResults, setFutureScenarioResults] = useState(null);
   const [selectedRound, setSelectedRound] = useState('current');
@@ -815,7 +816,8 @@ const EquityManagementApp = () => {
           shares: 1000000,
           price_per_share: 0.01,
           issue_date: '2023-01-01',
-          round: 'Seed Round',
+          round: 1, // Changed to integer
+          round_description: 'Seed Round', // New field
         },
         {
           shareholder_id: createdShareholders[1].id,
@@ -823,7 +825,8 @@ const EquityManagementApp = () => {
           shares: 500000,
           price_per_share: 1.50,
           issue_date: '2023-06-15',
-          round: 'Series A',
+          round: 2, // Changed to integer
+          round_description: 'Series A', // New field
         },
         {
           shareholder_id: createdShareholders[2].id,
@@ -831,7 +834,8 @@ const EquityManagementApp = () => {
           shares: 50000,
           price_per_share: 0.01,
           issue_date: '2023-02-01',
-          round: 'Seed Round',
+          round: 1, // Changed to integer
+          round_description: 'Seed Round', // New field
         },
       ];
 
@@ -988,7 +992,8 @@ const EquityManagementApp = () => {
           shares: parseInt(data.shares),
           price_per_share: parseFloat(data.pricePerShare),
           issue_date: data.issueDate,
-          round: data.round || null,
+          round: parseInt(data.roundNumber), // Use roundNumber
+          round_description: data.roundTitle, // Use roundTitle
           payment_status: data.payment_status || 'No', // Default if not provided
         })
         .select()
@@ -1044,7 +1049,8 @@ const EquityManagementApp = () => {
         const shareClass = shareClasses.find(sc => sc.id == shareClassId);
         const totalShares = _.sumBy(issuances, 'shares');
         const totalValue = _.sumBy(issuances, i => i.shares * i.price_per_share);
-        const issuanceRound = issuances[0]?.round || 'N/A';
+        const issuanceRound = issuances[0]?.round || 'N/A'; // Use round number here
+        const issuanceRoundTitle = issuances[0]?.round_description || 'N/A'; // Use round title here
 
         return {
           id: shareClassId,
@@ -1053,7 +1059,8 @@ const EquityManagementApp = () => {
           totalShares,
           totalValue,
           percentage: 0,
-          round: issuanceRound,
+          round: issuanceRound, // Pass the round number
+          roundTitle: issuanceRoundTitle, // Pass the round title
         };
       })
       .orderBy('priority')
@@ -1092,7 +1099,8 @@ const EquityManagementApp = () => {
             ...i,
             shareClassName: shareClasses.find(sc => sc.id === i.share_class_id)?.name || 'Unknown',
             valuation: i.shares * i.price_per_share,
-            round: i.round,
+            round: i.round, // Pass the round number
+            roundTitle: i.round_description, // Pass the round title
           }))
         };
       })
@@ -1145,20 +1153,24 @@ const EquityManagementApp = () => {
   const handleCalculateFutureScenario = async (e) => {
     e.preventDefault();
     setErrors([]);
-    const results = await fetchEquityCalculations(futureIssuanceData);
+    const results = await fetchEquityCalculations({
+      ...futureIssuanceData,
+      round: parseInt(futureIssuanceData.roundNumber), // Ensure round is integer
+      round_description: futureIssuanceData.roundTitle, // Pass round title
+    });
     if (results) {
       setFutureScenarioResults(results);
     }
   };
 
-  const getEquityDataForRound = (roundName) => {
-    if (roundName === 'current') {
+  const getEquityDataForRound = (roundNumber) => {
+    if (roundNumber === 'current') {
       return {
         companyData: getCompanyData(shareIssuances),
         shareholderData: getShareholderData(shareIssuances)
       };
     } else {
-      const issuancesForRound = shareIssuances.filter(issuance => issuance.round === roundName);
+      const issuancesForRound = shareIssuances.filter(issuance => issuance.round === parseInt(roundNumber));
       return {
         companyData: getCompanyData(issuancesForRound),
         shareholderData: getShareholderData(issuancesForRound)
@@ -1170,9 +1182,9 @@ const EquityManagementApp = () => {
   const displayEquityData = selectedRound === 'current' ? currentEquityData : getEquityDataForRound(selectedRound);
 
   const uniqueRounds = _.chain(shareIssuances)
-    .map('round')
-    .compact()
-    .uniq()
+    .map(issuance => ({ round: issuance.round, roundTitle: issuance.round_description }))
+    .uniqBy('round')
+    .sortBy('round')
     .value();
 
 
@@ -1185,8 +1197,8 @@ const EquityManagementApp = () => {
         const lines = text.split('\n').slice(1);
 
         for (const line of lines) {
-          const [shareholderName, shareClassName, shares, pricePerShare, issueDate, round] = line.split(',').map(s => s.trim());
-          if (shareholderName && shares) {
+          const [shareholderName, shareClassName, shares, pricePerShare, issueDate, roundNumber, roundTitle] = line.split(',').map(s => s.trim());
+          if (shareholderName && shares && roundNumber) { // Round Number is now required
             let shareholder = shareholders.find(s => s.name === shareholderName);
             if (!shareholder) {
               console.warn(`Shareholder "${shareholderName}" not found. Skipping issuance.`);
@@ -1205,7 +1217,8 @@ const EquityManagementApp = () => {
               shares: parseInt(shares),
               pricePerShare: parseFloat(pricePerShare),
               issueDate: issueDate || new Date().toISOString().split('T')[0],
-              round: round || null,
+              roundNumber: parseInt(roundNumber), // Use roundNumber
+              roundTitle: roundTitle || null, // Use roundTitle
               payment_status: 'No', // Default for CSV upload if not provided in CSV
             };
             await createIssuance(issuance);
@@ -1277,7 +1290,7 @@ const EquityManagementApp = () => {
         item.totalShares.toLocaleString(),
         `$${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
         `${item.percentage}%`,
-        item.round
+        `${item.round} (${item.roundTitle})` // Display both round number and title
       ]);
       pdf.autoTable({
         startY: y,
@@ -1302,7 +1315,7 @@ const EquityManagementApp = () => {
         sh.type,
         sh.totalShares.toLocaleString(),
         `$${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
-        sh.holdings.map(h => `${h.shareClassName}: ${h.shares.toLocaleString()} @ $${h.price_per_share.toFixed(2)} (Round: ${h.round || 'N/A'})`).join('\n')
+        sh.holdings.map(h => `${h.shareClassName}: ${h.shares.toLocaleString()} @ $${h.price_per_share.toFixed(2)} (Round: ${h.round} - ${h.roundTitle || 'N/A'})`).join('\n') // Display both
       ]);
       pdf.autoTable({
         startY: y,
@@ -1329,7 +1342,7 @@ const EquityManagementApp = () => {
           const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
           return [
             issuance.issue_date,
-            issuance.round || 'N/A',
+            `${issuance.round} (${issuance.round_description || 'N/A'})`, // Display both
             shareholder?.name || 'Unknown',
             shareClass?.name || 'Unknown',
             issuance.shares.toLocaleString(),
@@ -1376,7 +1389,7 @@ const EquityManagementApp = () => {
 
       shareholderData.forEach(sh => {
         const holdingsString = sh.holdings.map(h =>
-          `${h.shareClassName}: ${h.shares} @ $${h.price_per_share} (Round: ${h.round || 'N/A'}) - Value: $${h.valuation}`
+          `${h.shareClassName}: ${h.shares} @ $${h.price_per_share} (Round: ${h.round} - ${h.roundTitle || 'N/A'}) - Value: $${h.valuation}`
         ).join('; ');
 
         const row = [
@@ -1838,7 +1851,7 @@ const EquityManagementApp = () => {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.totalShares.toLocaleString()}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.percentage}%</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.round}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.round} ({item.roundTitle})</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1904,7 +1917,7 @@ const EquityManagementApp = () => {
                               <td className="px-6 py-4 text-sm" style={{ color: theme.lightText }}>
                                 {shareholder.holdings.map((holding, idx) => (
                                   <div key={idx} className="mb-1">
-                                    {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                    {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round} - {holding.roundTitle || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                   </div>
                                 ))}
                               </td>
@@ -1955,7 +1968,7 @@ const EquityManagementApp = () => {
                               return (
                                 <tr key={issuance.id}>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.issue_date}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round || 'N/A'}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round} ({issuance.round_description || 'N/A'})</td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{shareholder?.name}</td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareClass?.name}</td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.shares.toLocaleString()}</td>
@@ -1997,7 +2010,7 @@ const EquityManagementApp = () => {
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
                     <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Upload CSV File (Advanced)</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
-                      CSV format: <code className="font-mono">shareholderName, shareClassName, shares, pricePerShare, issueDate, round</code>
+                      CSV format: <code className="font-mono">shareholderName, shareClassName, shares, pricePerShare, issueDate, roundNumber, roundTitle</code>
                     </p>
                     <input
                       type="file"
@@ -2073,15 +2086,15 @@ const EquityManagementApp = () => {
                     >
                       <option value="current">Select a Round...</option>
                       {uniqueRounds.map(round => (
-                        <option key={round} value={round}>{round}</option>
+                        <option key={round.round} value={round.round}>{round.round} ({round.roundTitle || 'N/A'})</option>
                       ))}
                     </select>
                     {selectedRound !== 'current' && selectedRound !== '' && (
                       <div className="mt-4">
-                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Status at {selectedRound}:</h4>
+                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Status at Round {displayEquityData.companyData.classSummary[0]?.round} ({displayEquityData.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
                         <p style={{ color: theme.lightText }}>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
                         <p style={{ color: theme.lightText }}>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Holdings at {selectedRound}:</h4>
+                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Holdings at Round {displayEquityData.companyData.classSummary[0]?.round} ({displayEquityData.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
                             <thead style={{ backgroundColor: theme.background }}>
@@ -2211,6 +2224,29 @@ const EquityManagementApp = () => {
                           className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Round Number (Future Issuance)</label>
+                        <input
+                          type="number"
+                          value={futureIssuanceData.roundNumber}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, roundNumber: e.target.value})}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
+                          min="1"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Round Title (Future Issuance)</label>
+                        <input
+                          type="text"
+                          value={futureIssuanceData.roundTitle}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, roundTitle: e.target.value})}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
+                          maxLength="30"
                         />
                       </div>
                       <button
@@ -2645,12 +2681,13 @@ const ShareClassForm = ({ onSubmit, onCancel }) => {
 
 const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialData = {} }) => {
   const [data, setData] = useState({
+    roundNumber: initialData.round || '', // Use round for roundNumber
+    roundTitle: initialData.round_description || '', // Use round_description for roundTitle
     shareholderId: initialData.shareholder_id || '',
     shareClassId: initialData.share_class_id || '',
     shares: initialData.shares || '',
     pricePerShare: initialData.price_per_share || '',
     issueDate: new Date().toISOString().split('T')[0],
-    round: initialData.round || '',
     payment_status: initialData.payment_status || 'No',
   });
   const handleSubmit = (e) => {
@@ -2662,6 +2699,27 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
     <form onSubmit={handleSubmit}>
       <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Record Share Issuance</h3>
       <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Round Number</label>
+          <input
+            type="number"
+            value={data.roundNumber}
+            onChange={(e) => setData({...data, roundNumber: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min="1"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Round Title (e.g., Seed, Series A)</label>
+          <input
+            type="text"
+            value={data.roundTitle}
+            onChange={(e) => setData({...data, roundTitle: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            maxLength="30"
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder</label>
           <select
@@ -2724,16 +2782,6 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Issuance Round</label>
-          <input
-            type="text"
-            value={data.round}
-            onChange={(e) => setData({...data, round: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., Seed, Series A"
-          />
-        </div>
-        <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Shares have been paid for?</label>
             <select value={data.payment_status} onChange={(e) => setData({...data, payment_status: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
                 <option>Yes</option>
@@ -2764,11 +2812,11 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
 // New Component: BulkIssuanceForm
 const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) => {
   const [issuances, setIssuances] = useState([
-    { shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '', payment_status: 'No' }
+    { roundNumber: '', roundTitle: '', shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], payment_status: 'No' }
   ]);
 
   const addRow = () => {
-    setIssuances([...issuances, { shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '', payment_status: 'No' }]);
+    setIssuances([...issuances, { roundNumber: '', roundTitle: '', shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], payment_status: 'No' }]);
   };
 
   const removeRow = (index) => {
@@ -2786,7 +2834,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
     e.preventDefault();
     let allSuccessful = true;
     for (const issuance of issuances) {
-      if (!issuance.shareholderId || !issuance.shareClassId || !issuance.shares || !issuance.pricePerShare || !issuance.issueDate) {
+      if (!issuance.shareholderId || !issuance.shareClassId || !issuance.shares || !issuance.pricePerShare || !issuance.issueDate || !issuance.roundNumber) {
         addError('Please fill all required fields for all issuances.');
         allSuccessful = false;
         break;
@@ -2802,7 +2850,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
     if (allSuccessful) {
       // Use custom modal or toast for success instead of alert
       addError('All issuances added successfully!');
-      setIssuances([{ shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '', payment_status: 'No' }]);
+      setIssuances([{ roundNumber: '', roundTitle: '', shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], payment_status: 'No' }]);
     }
   };
 
@@ -2822,6 +2870,27 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
             </button>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Round Number</label>
+              <input
+                type="number"
+                value={issuance.roundNumber}
+                onChange={(e) => handleChange(index, 'roundNumber', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="1"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Round Title (e.g., Seed, Series A)</label>
+              <input
+                type="text"
+                value={issuance.roundTitle}
+                onChange={(e) => handleChange(index, 'roundTitle', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                maxLength="30"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder</label>
               <select
@@ -2881,16 +2950,6 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
                 onChange={(e) => handleChange(index, 'issueDate', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Issuance Round</label>
-              <input
-                type="text"
-                value={issuance.round}
-                onChange={(e) => handleChange(index, 'round', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Seed, Series A"
               />
             </div>
             <div>
