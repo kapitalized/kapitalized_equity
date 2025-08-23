@@ -37,6 +37,18 @@ const countryData = {
   "Canada": ["Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Nova Scotia", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan"]
 };
 
+// --- Share Types List ---
+const SHARE_TYPES = [
+  'Common',
+  'Preference Participating',
+  'Preference Non-Participating',
+  'Founder',
+  'Management',
+  'Convertible',
+  'Options',
+  'Other'
+];
+
 
 const AdminDashboard = ({ addError }) => {
   const [loadingAdminData, setLoadingAdminData] = useState(true);
@@ -934,7 +946,7 @@ const EquityManagementApp = () => {
         .single();
 
       if (error) throw error;
-      setShareholders([...shareholders, newShareholder]);
+      setShareholders(prevShareholders => [...prevShareholders, newShareholder]); // Correctly update state
       setShowCreateShareholder(false);
       setShowBulkAddShareholder(false);
     } catch (error) {
@@ -2556,7 +2568,7 @@ const CompanyForm = ({ onSubmit, onCancel }) => {
 };
 
 const ShareholderForm = ({ onSubmit, onCancel }) => {
-  const [data, setData] = useState({ name: '', email: '', type: 'Shareholder' });
+  const [data, setData] = useState({ name: '', email: '', type: SHARE_TYPES[0] }); // Default to first type
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit(data);
@@ -2590,12 +2602,11 @@ const ShareholderForm = ({ onSubmit, onCancel }) => {
             value={data.type}
             onChange={(e) => setData({...data, type: e.target.value})}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
           >
-            <option value="Founder">Founder</option>
-            <option value="Employee">Employee</option>
-            <option value="Investor">Investor</option>
-            <option value="Advisor">Advisor</option>
-            <option value="Other">Other</option>
+            {SHARE_TYPES.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -2986,7 +2997,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
 // New Component: BulkShareholderForm
 const BulkShareholderForm = ({ onSubmit, addError }) => {
   const [shareholders, setShareholders] = useState(
-    Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' }))
+    Array.from({ length: 5 }, () => ({ name: '', email: '', type: SHARE_TYPES[0] })) // Default to first type
   );
 
   const handleChange = (index, field, value) => {
@@ -3011,7 +3022,7 @@ const BulkShareholderForm = ({ onSubmit, addError }) => {
     }
     if (allSuccessful) {
       addError('All valid shareholders added successfully!');
-      setShareholders(Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' })));
+      setShareholders(Array.from({ length: 5 }, () => ({ name: '', email: '', type: SHARE_TYPES[0] })));
     }
   };
 
@@ -3046,12 +3057,11 @@ const BulkShareholderForm = ({ onSubmit, addError }) => {
                 value={shareholder.type}
                 onChange={(e) => handleChange(index, 'type', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
               >
-                <option value="Founder">Founder</option>
-                <option value="Employee">Employee</option>
-                <option value="Investor">Investor</option>
-                <option value="Advisor">Advisor</option>
-                <option value="Other">Other</option>
+                {SHARE_TYPES.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -3331,6 +3341,5 @@ const AddressForm = ({ initialAddress, onAddressChange }) => {
     </div>
   );
 };
-
-
+           
 export default EquityManagementApp;
