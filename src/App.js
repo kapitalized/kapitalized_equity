@@ -667,5 +667,3 @@ const Modal = ({ children, onClose }) => (
   );
 
 export default EquityManagementApp;
-" in the document above, and am asking the following query:
-blank page 
