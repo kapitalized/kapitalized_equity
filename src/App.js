@@ -153,7 +153,7 @@ const EquityManagementApp = () => {
   const [shareholders, setShareholders] = useState([]);
   const [shareClasses, setShareClasses] = useState([]);
   const [shareIssuances, setShareIssuances] = useState([]);
-  const [activeTab, setActiveTab] = useState('productSelect');
+  const [activeTab, setActiveTab] = useState('equityHome');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [signUpSuccessMessage, setSignUpSuccessMessage] = useState('');
@@ -343,14 +343,12 @@ const EquityManagementApp = () => {
         );
     }
     
-    // Original content rendering logic based on activeTab
-    // This part will now only render if a company exists and is selected
     if (selectedCompany) {
         switch (activeTab) {
             case 'equityHome':
-                return <div>Equity Home Content</div>; // Replace with actual component
+                return <div>Equity Home Content</div>;
             case 'shareholders':
-                return <div>Shareholders Content</div>; // Replace with actual component
+                return <div>Shareholders Content</div>;
             case 'payments':
                  return <PaymentsPage userProfile={userProfile} />;
             case 'account':
@@ -363,15 +361,14 @@ const EquityManagementApp = () => {
                               onDeleteAccount={() => {}}
                             />;
                 }
-                return <div>Profile Content</div>; // Replace with actual component
+                return <div>Profile Content</div>;
             default:
                 return <div>Select a tab</div>;
         }
     }
-    return null; // Return null if no company is selected but companies exist
+    return null;
   }
 
-  // --- FIX: Corrected main return logic ---
   if (loading) {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -381,10 +378,10 @@ const EquityManagementApp = () => {
     );
   }
 
-  if (!user) { // Show login/signup form if no user is authenticated
+  if (!user) {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            {/* Login/Signup Form JSX */}
+            {/* Login/Signup Form JSX will go here */}
         </div>
     );
   }
@@ -392,13 +389,25 @@ const EquityManagementApp = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <div className={`bg-white shadow-md transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-64'} h-screen flex flex-col`}>
-        {/* Sidebar content */}
+        <div className="flex items-center justify-between p-4 border-b">
+          {!isSidebarCollapsed && (
+            <img src="https://kapitalized.com/wp-content/uploads/KAP-Logo-150px.webp" alt="Kapitalized Logo" className="h-10" />
+          )}
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="p-2 rounded-md hover:bg-gray-100 focus:outline-none"
+          >
+            {isSidebarCollapsed ? <ChevronRight className="h-6 w-6" /> : <ChevronLeft className="h-6 w-6" />}
+          </button>
+        </div>
+        <nav className="flex-1 px-2 py-4 space-y-2">
+          {/* Sidebar menu items */}
+        </nav>
       </div>
       <div className="flex-1 flex flex-col">
         <div className="bg-white shadow-sm border-b" style={{ borderColor: theme.borderColor }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
-                {/* Header Content */}
                 <div className="relative">
                     <button onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)} className="flex items-center text-sm">
                         <User className="h-5 w-5 mr-1" />
@@ -658,3 +667,5 @@ const Modal = ({ children, onClose }) => (
   );
 
 export default EquityManagementApp;
+" in the document above, and am asking the following query:
+blank page 
