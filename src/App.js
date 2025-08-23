@@ -214,8 +214,63 @@ const EquityManagementApp = () => {
     setUserProfile(null);
   };
 
-  const fetchInitialData = async (userId) => { /* ... */ };
-  const fetchUserProfile = async (userId) => { /* ... */ };
+  // --- FIX: Re-added missing function definitions ---
+  const fetchInitialData = async (userId) => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+        const { data: companiesData, error: companiesError } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('user_id', userId);
+        if (companiesError) throw companiesError;
+        setCompanies(companiesData);
+        if (companiesData.length > 0) {
+            setSelectedCompany(companiesData[0]);
+            fetchCompanyRelatedData(companiesData[0].id);
+        } else {
+            setSelectedCompany(null);
+        }
+    } catch (error) {
+        setErrorMessage('Error fetching companies: ' + error.message);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const fetchCompanyRelatedData = async (companyId) => {
+    if (!companyId) return;
+    setLoading(true);
+    setErrorMessage('');
+    try {
+        const { data: shareholdersData, error: shareholdersError } = await supabase.from('shareholders').select('*').eq('company_id', companyId);
+        if (shareholdersError) throw shareholdersError;
+        setShareholders(shareholdersData);
+
+        const { data: shareClassesData, error: shareClassesError } = await supabase.from('share_classes').select('*').eq('company_id', companyId);
+        if (shareClassesError) throw shareClassesError;
+        setShareClasses(shareClassesData);
+
+        const { data: shareIssuancesData, error: shareIssuancesError } = await supabase.from('share_issuances').select('*').eq('company_id', companyId);
+        if (shareIssuancesError) throw shareIssuancesError;
+        setShareIssuances(shareIssuancesData);
+    } catch (error) {
+        setErrorMessage('Error fetching company data: ' + error.message);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const fetchUserProfile = async (userId) => {
+    try {
+        const { data, error } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
+        if (error && error.code !== 'PGRST116') throw error;
+        setUserProfile(data);
+    } catch (error) {
+        setErrorMessage('Error fetching profile: ' + error.message);
+    }
+  };
+  // --- END OF FIX ---
 
   const updateUserEmail = async (newEmail) => {
     setLoading(true);
