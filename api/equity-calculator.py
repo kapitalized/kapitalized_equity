@@ -43,6 +43,8 @@ class Issuance(BaseModel):
     price_per_share: float
     issue_date: str
     round: Optional[str] = None
+    round_description: Optional[str] = None # ADDED
+    payment_status: Optional[str] = None    # ADDED
     created_at: Optional[str] = None
 
 class FutureIssuance(BaseModel):
