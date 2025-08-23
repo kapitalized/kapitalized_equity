@@ -22,7 +22,7 @@ const theme = {
 
 // Supabase client initialization
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
+const supabaseAnonKey = "eyJhbGciOiJIUzIM4InR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
 
 let supabase = null;
 if (typeof window !== 'undefined' && window.supabase) {
@@ -190,7 +190,12 @@ const EquityManagementApp = () => {
           fetchUserProfile(currentUser.id);
         } else {
           setShowLogin(true);
-          // Reset all state on logout
+          setCompanies([]);
+          setSelectedCompany(null);
+          setShareholders([]);
+          setShareClasses([]);
+          setShareIssuances([]);
+          setUserProfile(null);
         }
         setLoading(false);
       }
@@ -201,13 +206,17 @@ const EquityManagementApp = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    // Reset all state
+    setCompanies([]);
+    setSelectedCompany(null);
+    setShareholders([]);
+    setShareClasses([]);
+    setShareIssuances([]);
+    setUserProfile(null);
   };
 
   const fetchInitialData = async (userId) => { /* ... */ };
   const fetchUserProfile = async (userId) => { /* ... */ };
 
-  // --- NEW: Function to update user email ---
   const updateUserEmail = async (newEmail) => {
     setLoading(true);
     setErrorMessage('');
@@ -230,65 +239,84 @@ const EquityManagementApp = () => {
 
   const createCompany = async (data) => {
     if (!user) return;
-    const addressString = JSON.stringify(data.address);
-    // ... rest of the logic, sending addressString to Supabase
+    const { error } = await supabase.from('companies').insert([{ 
+        name: data.name, 
+        description: data.description, 
+        user_id: user.id,
+        address: data.address 
+    }]);
+    if (error) setErrorMessage(error.message);
+    else fetchInitialData(user.id);
   };
 
   const createIssuance = async (data) => {
     if (!selectedCompany) return;
-    // ... logic to insert new fields: round_description, payment_status
+    const { error } = await supabase.from('share_issuances').insert([{
+        company_id: selectedCompany.id,
+        shareholder_id: data.shareholderId,
+        share_class_id: data.shareClassId,
+        shares: data.shares,
+        price_per_share: data.pricePerShare,
+        issue_date: data.issueDate,
+        round: data.round,
+        round_description: data.round_description,
+        payment_status: data.payment_status
+    }]);
+    if (error) setErrorMessage(error.message);
+    else fetchCompanyRelatedData(selectedCompany.id);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <div className={`bg-white shadow-md ...`}>
-        {/* ... Sidebar content ... */}
+      <div className={`bg-white shadow-md transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-16' : 'w-64'} h-screen flex flex-col`}>
+        {/* Sidebar content */}
       </div>
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white shadow-sm ...">
-          <div className="relative">
-            <button onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)}>{/* ... */}</button>
-            {showLoginDetailsDropdown && (
-              <div className="absolute right-0 ...">
-                {/* ... other buttons ... */}
-                <button
-                  onClick={() => { setActiveTab('payments'); setShowLoginDetailsDropdown(false); }}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                >
-                  Payments
-                </button>
-                <button onClick={handleLogout}>{/* ... */}</button>
-              </div>
-            )}
+        <div className="bg-white shadow-sm border-b" style={{ borderColor: theme.borderColor }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+                {/* Header Content */}
+                <div className="relative">
+                    <button onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)} className="flex items-center text-sm">
+                        <User className="h-5 w-5 mr-1" />
+                        {userProfile?.username || user?.email} <ChevronDown className="ml-1 h-4 w-4" />
+                    </button>
+                    {showLoginDetailsDropdown && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                        <button onClick={() => { setActiveTab('account'); setMyAccountSubTab('profile'); setShowLoginDetailsDropdown(false); }} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left">Profile</button>
+                        <button onClick={() => { setActiveTab('account'); setMyAccountSubTab('loginDetails'); setShowLoginDetailsDropdown(false); }} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left">Login Details</button>
+                        <button onClick={() => { setActiveTab('payments'); setShowLoginDetailsDropdown(false); }} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left">Payments</button>
+                        <button onClick={handleLogout} className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left">Logout</button>
+                    </div>
+                    )}
+                </div>
+            </div>
           </div>
         </div>
-        {/* Main Content Body */}
         <div className="flex-1 overflow-y-auto p-6">
-          {successMessage && <div className="bg-green-100 ...">{successMessage}</div>}
-          {/* ... other content ... */}
+          {successMessage && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">{successMessage}</div>}
+          {errorMessage && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">{errorMessage}</div>}
+          
           {activeTab === 'payments' && (
             <PaymentsPage userProfile={userProfile} />
           )}
-          {activeTab === 'account' && (
+          {activeTab === 'account' && myAccountSubTab === 'loginDetails' && (
             <LoginDetailsForm
               userEmail={user?.email}
               onEmailChange={updateUserEmail}
-              /* ... other props ... */
+              onPasswordChange={() => {}}
+              onDeactivateAccount={() => {}}
+              onDeleteAccount={() => {}}
             />
           )}
+          {/* Other tab content */}
         </div>
       </div>
-      {/* Modals */}
-      {showCreateCompany && <Modal onClose={() => setShowCreateCompany(false)}><CompanyForm onSubmit={createCompany} /></Modal>}
-      {showCreateIssuance && <Modal onClose={() => setShowCreateIssuance(false)}><IssuanceForm onSubmit={createIssuance} /></Modal>}
+      {showCreateCompany && <Modal onClose={() => setShowCreateCompany(false)}><CompanyForm onSubmit={createCompany} onCancel={() => setShowCreateCompany(false)} /></Modal>}
+      {showCreateIssuance && <Modal onClose={() => setShowCreateIssuance(false)}><IssuanceForm onSubmit={createIssuance} onCancel={() => setShowCreateIssuance(false)} shareholders={shareholders} shareClasses={shareClasses} /></Modal>}
     </div>
   );
 };
-
-// --- NEW/UPDATED Reusable Components ---
 
 const AddressForm = ({ initialAddress, onAddressChange }) => {
   const [address, setAddress] = useState(initialAddress || { line1: '', line2: '', country: '', state: '', postcode: '' });
@@ -305,7 +333,7 @@ const AddressForm = ({ initialAddress, onAddressChange }) => {
   const handleChange = (field, value) => {
     const newAddress = { ...address, [field]: value };
     if (field === 'country') {
-      newAddress.state = ''; // Reset state when country changes
+      newAddress.state = '';
     }
     setAddress(newAddress);
     onAddressChange(newAddress);
@@ -315,29 +343,29 @@ const AddressForm = ({ initialAddress, onAddressChange }) => {
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Street number and name</label>
-        <input type="text" value={address.line1} onChange={(e) => handleChange('line1', e.target.value)} className="w-full ..." required />
+        <input type="text" value={address.line1} onChange={(e) => handleChange('line1', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Line 2 (optional)</label>
-        <input type="text" value={address.line2} onChange={(e) => handleChange('line2', e.target.value)} className="w-full ..." />
+        <input type="text" value={address.line2} onChange={(e) => handleChange('line2', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-        <select value={address.country} onChange={(e) => handleChange('country', e.target.value)} className="w-full ..." required>
+        <select value={address.country} onChange={(e) => handleChange('country', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
           <option value="">Select Country</option>
           {Object.keys(countryData).map(country => <option key={country} value={country}>{country}</option>)}
         </select>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">State or Province</label>
-        <select value={address.state} onChange={(e) => handleChange('state', e.target.value)} className="w-full ..." required disabled={!states.length}>
+        <select value={address.state} onChange={(e) => handleChange('state', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required disabled={!states.length}>
           <option value="">Select State/Province</option>
           {states.map(state => <option key={state} value={state}>{state}</option>)}
         </select>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Postcode or Zip</label>
-        <input type="text" value={address.postcode} onChange={(e) => handleChange('postcode', e.target.value)} className="w-full ..." required />
+        <input type="text" value={address.postcode} onChange={(e) => handleChange('postcode', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
       </div>
     </div>
   );
@@ -363,7 +391,7 @@ const PaymentsPage = ({ userProfile }) => {
                     <p className="text-sm text-gray-600 mb-4">
                         Unlock advanced reports, scenario planning, and unlimited company management.
                     </p>
-                    <button className="w-full bg-blue-600 text-white py-3 px-4 rounded-md ...">
+                    <button className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center text-lg font-semibold">
                         Upgrade Now
                     </button>
                 </div>
@@ -374,7 +402,6 @@ const PaymentsPage = ({ userProfile }) => {
 
 const LoginDetailsForm = ({ userEmail, onEmailChange, onPasswordChange, onDeactivateAccount, onDeleteAccount }) => {
   const [newEmail, setNewEmail] = useState('');
-  // ... other state for password change
   
   const handleEmailSubmit = (e) => {
     e.preventDefault();
@@ -391,18 +418,18 @@ const LoginDetailsForm = ({ userEmail, onEmailChange, onPasswordChange, onDeacti
         <form onSubmit={handleEmailSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Current Email</label>
-            <input type="email" value={userEmail || ''} className="w-full ... bg-gray-50" readOnly />
+            <input type="email" value={userEmail || ''} className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed" readOnly />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">New Email</label>
-            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="w-full ..." required />
+            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
           </div>
           <div className="flex justify-end">
-            <button type="submit" className="px-4 py-2 ... bg-blue-600">Update Email</button>
+            <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Update Email</button>
           </div>
         </form>
       </div>
-      {/* ... Password change and account actions forms ... */}
+      {/* Password change and account actions forms would go here */}
     </div>
   );
 };
@@ -411,40 +438,111 @@ const IssuanceForm = ({ onSubmit, onCancel, shareholders, shareClasses }) => {
   const [data, setData] = useState({
     round: 'Round 1',
     round_description: '',
+    shareholderId: '',
+    shareClassId: '',
+    shares: '',
+    pricePerShare: '',
+    issueDate: new Date().toISOString().split('T')[0],
     payment_status: 'No',
-    // ... other fields
   });
 
+  const handleChange = (field, value) => {
+    setData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(data);
+  };
+
   return (
-    <form>
-      <h3 className="text-lg ...">Record Share Issuance</h3>
+    <form onSubmit={handleSubmit}>
+      <h3 className="text-lg font-medium text-gray-900 mb-4">Record Share Issuance</h3>
       <div className="space-y-4">
         <div>
-          <label>Issuance Round</label>
-          <select value={data.round} onChange={/* ... */} required>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Issuance Round</label>
+          <select value={data.round} onChange={(e) => handleChange('round', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
             <option>Round 1</option>
             <option>Round 2</option>
-            {/* ... more rounds ... */}
+            <option>Round 3</option>
+            <option>Round 4</option>
+            <option>Round 5</option>
           </select>
         </div>
         <div>
-          <label>Round Description</label>
-          <input type="text" value={data.round_description} maxLength="50" onChange={/* ... */} />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Round Description (e.g., Seed, Series A)</label>
+          <input type="text" value={data.round_description} maxLength="50" onChange={(e) => handleChange('round_description', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
         </div>
-        {/* ... other form fields ... */}
         <div>
-          <label>Shares have been paid for?</label>
-          <select value={data.payment_status} onChange={/* ... */} required>
-            <option>Yes</option>
-            <option>Partial</option>
-            <option>No</option>
-          </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder</label>
+            <select value={data.shareholderId} onChange={(e) => handleChange('shareholderId', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                <option value="">Select Shareholder</option>
+                {shareholders.map(sh => <option key={sh.id} value={sh.id}>{sh.name}</option>)}
+            </select>
+        </div>
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Shares have been paid for?</label>
+            <select value={data.payment_status} onChange={(e) => handleChange('payment_status', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                <option>Yes</option>
+                <option>Partial</option>
+                <option>No</option>
+            </select>
         </div>
       </div>
-      {/* ... form buttons ... */}
+      <div className="flex justify-end space-x-2 mt-6">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
+        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Record Issuance</button>
+      </div>
     </form>
   );
 };
 
+
+const CompanyForm = ({ onSubmit, onCancel }) => {
+    const [data, setData] = useState({ name: '', description: '', address: null });
+    
+    const handleAddressChange = (address) => {
+        setData(prev => ({ ...prev, address }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSubmit(data);
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Company</h3>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                    <input type="text" value={data.name} onChange={(e) => setData({...data, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md" required />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea value={data.description} onChange={(e) => setData({...data, description: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md" rows="3" />
+                </div>
+                <AddressForm onAddressChange={handleAddressChange} />
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+                <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">Cancel</button>
+                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md">Create Company</button>
+            </div>
+        </form>
+    );
+};
+
+const Modal = ({ children, onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto relative">
+        <button onClick={onClose} className="absolute top-3 right-3 text-gray-500 hover:text-gray-800">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        {children}
+      </div>
+    </div>
+  );
 
 export default EquityManagementApp;
