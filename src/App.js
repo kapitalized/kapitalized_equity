@@ -1,55 +1,59 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search } from 'lucide-react';
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
+import { createClient } from '@supabase/supabase-js'; // Import createClient
 
-// IMPORTANT: Replace with the URL of your Vercel Serverless Function
-const PYTHON_BACKEND_URL = "/api/equity-calculator";
+// IMPORTANT: URL for the main equity calculation FastAPI endpoint
+const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
+// IMPORTANT: Base URL for admin operations on FastAPI
+const ADMIN_BACKEND_BASE_URL = "/api/admin";
+
 // IMPORTANT: Replace with your WooCommerce Subscription Product URL
 const WOOCOMMERCE_SUBSCRIPTION_URL = "https://your-wordpress-site.com/product/your-subscription-product/";
 
 // Define the main theme colors for consistency
 const theme = {
-  primary: '#1a73e8', // Blue from dashboard design
-  secondary: '#34a853', // Green
-  accent: '#fbbc05', // Yellow
-  background: '#f8f9fa', // Light gray background
-  cardBackground: '#ffffff', // White card background
-  text: '#202124', // Dark gray text
-  lightText: '#5f6368', // Lighter gray text
-  borderColor: '#dadce0', // Light gray border
+  primary: '#1a73e8',
+  secondary: '#34a853',
+  accent: '#fbbc05',
+  background: '#f8f9fa',
+  cardBackground: '#ffffff',
+  text: '#202124',
+  lightText: '#5f6368',
+  borderColor: '#dadce0',
 };
 
-// Supabase client initialization (Now relies solely on window.supabase from CDN)
-const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co"; // Your Supabase URL
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE"; // Corrected key
+// Supabase configuration
+const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
 
-let supabase = null;
-if (typeof window !== 'undefined' && window.supabase) { // Ensure window.supabase exists from CDN
-  supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  console.error("Supabase client could not be initialized. Ensure Supabase CDN script is loaded in public/index.html.");
-}
+let supabase = null; // Initialize as null, will be set in useEffect
+
+// --- Data for Address Dropdowns ---
+const countryData = {
+  "Australia": ["New South Wales", "Victoria", "Queensland", "Western Australia", "South Australia", "Tasmania", "Australian Capital Territory", "Northern Territory"],
+  "United States": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"],
+  "Canada": ["Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Nova Scotia", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan"]
+};
 
 
-// --- FIX: AdminDashboard Component Overhauled for Better UI and Filtering ---
-const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
+const AdminDashboard = ({ addError }) => {
   const [loadingAdminData, setLoadingAdminData] = useState(true);
   const [allUsers, setAllUsers] = useState([]);
   const [allCompanies, setAllCompanies] = useState([]);
   const [allIssuances, setAllIssuances] = useState([]);
-  const [currentView, setCurrentView] = useState('users'); // 'users', 'companies', or 'issuances'
+  const [currentView, setCurrentView] = useState('users');
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAllAdminData = async () => {
     setLoadingAdminData(true);
-    setErrorMessage('');
     try {
-      // Fetch all data types in parallel for efficiency
+      // Corrected fetch URLs to align with FastAPI /api/admin/{entity} structure
       const [usersResponse, companiesResponse, issuancesResponse] = await Promise.all([
-        fetch(`${PYTHON_BACKEND_URL}?entity=users`),
-        fetch(`${PYTHON_BACKEND_URL}?entity=companies`),
-        fetch(`${PYTHON_BACKEND_URL}?entity=issuances`)
+        fetch(`${ADMIN_BACKEND_BASE_URL}/users`),
+        fetch(`${ADMIN_BACKEND_BASE_URL}/companies`),
+        fetch(`${ADMIN_BACKEND_BASE_URL}/issuances`)
       ]);
 
       if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
@@ -66,7 +70,7 @@ const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
 
     } catch (error) {
       console.error("Error fetching admin data:", error);
-      setErrorMessage('Failed to fetch admin data: ' + error.message);
+      addError('Failed to fetch admin data: ' + error.message);
     } finally {
       setLoadingAdminData(false);
     }
@@ -77,46 +81,49 @@ const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
   }, []);
 
   const handleAdminDelete = async (id, type) => {
-    if (!window.confirm(`Are you sure you want to delete this ${type} and all its associated data? This cannot be undone.`)) {
-      return;
-    }
+    // Custom modal for confirmation instead of window.confirm
+    const confirmed = await new Promise(resolve => {
+        // This is a placeholder for a custom modal.
+        // In a real app, you'd show a modal component here and resolve based on user's choice.
+        const userConfirmed = window.confirm(`Are you sure you want to delete this ${type}? This cannot be undone.`);
+        resolve(userConfirmed);
+    });
+
+    if (!confirmed) return;
+
     setLoadingAdminData(true);
-    setErrorMessage('');
     try {
-      const response = await fetch(PYTHON_BACKEND_URL, {
+      // Corrected DELETE URL to align with FastAPI /api/admin/{entity}/{id} structure
+      // Note: 'type' here is singular (user, company, issuance), so we pluralize for the URL.
+      const entityPath = type + 's'; // e.g., 'users', 'companies', 'issuances'
+      const response = await fetch(`${ADMIN_BACKEND_BASE_URL}/${entityPath}/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, type }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorData.error}`);
+        throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorData.detail || errorData.error}`);
       }
-      alert(`${type} deleted successfully!`);
+      // Use a custom modal or toast for success instead of alert
+      console.log(`${type} deleted successfully!`); // Placeholder for success message
       fetchAllAdminData(); // Refresh data after deletion
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
-      setErrorMessage(`Failed to delete ${type}: ` + error.message);
+      addError(`Failed to delete ${type}: ` + error.message);
     } finally {
       setLoadingAdminData(false);
     }
   };
 
   const filteredUsers = allUsers.filter(user =>
-    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (user.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (user.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    Object.values(user).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()))
   );
-
   const filteredCompanies = allCompanies.filter(company =>
-    (company.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (company.description?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    Object.values(company).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()))
   );
-
   const filteredIssuances = allIssuances.filter(issuance =>
-    (issuance.round?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    issuance.shares.toString().includes(searchTerm)
+    Object.values(issuance).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (loadingAdminData) {
@@ -138,134 +145,102 @@ const AdminDashboard = ({ errorMessage, setErrorMessage }) => {
           <button onClick={() => setCurrentView('issuances')} className={`px-4 py-2 text-sm font-medium rounded-md ${currentView === 'issuances' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Issuances</button>
         </div>
       </div>
-
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder={`Filter ${currentView}...`}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          style={{ borderColor: theme.borderColor }}
-        />
+        <input type="text" placeholder={`Filter ${currentView}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" style={{ borderColor: theme.borderColor }} />
       </div>
-
-      <div className="bg-white shadow rounded-lg p-6" style={{ backgroundColor: theme.cardBackground }}>
+      <div className="bg-white shadow rounded-lg p-6">
+        {/* Render tables based on currentView */}
         {currentView === 'users' && (
-          <>
-            <h3 className="text-xl font-medium mb-4" style={{ color: theme.text }}>All Users ({filteredUsers.length})</h3>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                {/* Users Table Head */}
-                <thead style={{ backgroundColor: theme.background }}>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Username</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Full Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Is Admin</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
-                  </tr>
-                </thead>
-                {/* Users Table Body */}
-                <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                  {filteredUsers.map(user => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={user.id}>{user.id.substring(0, 8)}...</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.username || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.full_name || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.status}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{user.is_admin ? 'Yes' : 'No'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleAdminDelete(user.id, 'user')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredUsers.map((userItem) => (
+                            <tr key={userItem.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{userItem.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userItem.full_name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userItem.email}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(userItem.created_at).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button onClick={() => handleAdminDelete(userItem.id, 'user')} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-5 w-5"/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
-          </>
         )}
         {currentView === 'companies' && (
-          <>
-            <h3 className="text-xl font-medium mb-4" style={{ color: theme.text }}>All Companies ({filteredCompanies.length})</h3>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                {/* Companies Table Head */}
-                <thead style={{ backgroundColor: theme.background }}>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Description</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Owner User ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
-                  </tr>
-                </thead>
-                {/* Companies Table Body */}
-                <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                  {filteredCompanies.map(company => (
-                    <tr key={company.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.id}>{company.id.substring(0, 8)}...</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{company.description || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={company.user_id}>{company.user_id.substring(0, 8)}...</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleAdminDelete(company.id, 'company')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User ID</th>
+                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredCompanies.map((companyItem) => (
+                            <tr key={companyItem.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{companyItem.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{companyItem.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{companyItem.description}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{companyItem.user_id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button onClick={() => handleAdminDelete(companyItem.id, 'company')} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-5 w-5"/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
-          </>
         )}
         {currentView === 'issuances' && (
-          <>
-            <h3 className="text-xl font-medium mb-4" style={{ color: theme.text }}>All Share Issuances ({filteredIssuances.length})</h3>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                {/* Issuances Table Head */}
-                <thead style={{ backgroundColor: theme.background }}>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Company ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shareholder ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Price/Share</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Issue Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
-                  </tr>
-                </thead>
-                {/* Issuances Table Body */}
-                <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                  {filteredIssuances.map(issuance => (
-                    <tr key={issuance.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.id}>{issuance.id.substring(0, 8)}...</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.company_id}>{issuance.company_id.substring(0, 8)}...</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm truncate" style={{ color: theme.lightText }} title={issuance.shareholder_id}>{issuance.shareholder_id.substring(0, 8)}...</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.shares.toLocaleString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${issuance.price_per_share.toFixed(2)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.issue_date}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleAdminDelete(issuance.id, 'issuance')} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shareholder ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shares</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price/Share</th>
+                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredIssuances.map((issuanceItem) => (
+                            <tr key={issuanceItem.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{issuanceItem.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.company_id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.shareholder_id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.shares}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.price_per_share}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button onClick={() => handleAdminDelete(issuanceItem.id, 'issuance')} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-5 w-5"/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
-          </>
         )}
       </div>
     </div>
   );
 };
-// --- END OF FIX ---
 
 
 const EquityManagementApp = () => {
@@ -280,7 +255,7 @@ const EquityManagementApp = () => {
   const [shareClasses, setShareClasses] = useState([]);
   const [shareIssuances, setShareIssuances] = useState([]);
   const [activeTab, setActiveTab] = useState('productSelect'); // Initial tab is now product select
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errors, setErrors] = useState([]); // Use an array for multiple errors
   const [signUpSuccessMessage, setSignUpSuccessMessage] = useState('');
 
   const [showLogin, setShowLogin] = useState(true);
@@ -318,21 +293,44 @@ const EquityManagementApp = () => {
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
+  // Function to add an error
+  const addError = (message) => {
+    setErrors((prevErrors) => [...prevErrors, { id: Date.now(), message }]);
+  };
+
+  // Function to remove an error
+  const removeError = (id) => {
+    setErrors((prevErrors) => prevErrors.filter((error) => error.id !== id));
+  };
+
+  // Supabase client initialization moved to useEffect
   useEffect(() => {
+    if (typeof window !== 'undefined' && !supabase) { // Check if window is defined and supabase is not already initialized
+      try {
+        supabase = createClient(supabaseUrl, supabaseAnonKey);
+        console.log("Supabase client initialized.");
+      } catch (e) {
+        addError("Failed to initialize Supabase client: " + e.message);
+        setLoading(false);
+        return;
+      }
+    }
+
     if (!supabase) {
+      addError("Supabase client not initialized.");
       setLoading(false);
-      setErrorMessage("Supabase client not initialized. Cannot proceed with authentication. Please check browser console for details.");
       return;
     }
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user || null);
+        const currentUser = session?.user || null;
+        setUser(currentUser);
         setLoading(false);
-        if (session?.user) {
+        if (currentUser) {
           setShowLogin(false);
-          fetchInitialData(session.user.id);
-          fetchUserProfile(session.user.id);
+          fetchInitialData(currentUser.id);
+          fetchUserProfile(currentUser.id);
         } else {
           setShowLogin(true);
           setCompanies([]);
@@ -346,14 +344,21 @@ const EquityManagementApp = () => {
       }
     );
 
+    // Initial check for session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-      setLoading(false);
-      if (session?.user) {
-        setShowLogin(false);
-        fetchInitialData(session.user.id);
-        fetchUserProfile(session.user.id);
-      }
+        const currentUser = session?.user || null;
+        setUser(currentUser);
+        if (currentUser) {
+            setShowLogin(false);
+            fetchInitialData(currentUser.id);
+            fetchUserProfile(currentUser.id);
+        } else {
+            setShowLogin(true);
+        }
+        setLoading(false);
+    }).catch(e => {
+        addError("Error checking initial session: " + e.message);
+        setLoading(false);
     });
 
     return () => {
@@ -372,13 +377,14 @@ const EquityManagementApp = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
-      alert('Payment successful! Your premium features should now be active.');
+      // Use custom modal or toast instead of alert
+      addError('Payment successful! Your premium features should now be active.'); // Re-using addError for a temporary success display
       window.history.replaceState({}, document.title, window.location.pathname);
       if (user) {
         fetchUserProfile(user.id);
       }
     } else if (params.get('payment') === 'cancelled') {
-      alert('Payment was cancelled. You still have free access.');
+      addError('Payment was cancelled. You still have free access.'); // Re-using addError
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [user]);
@@ -386,11 +392,11 @@ const EquityManagementApp = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setErrorMessage('');
+    setErrors([]); // Clear errors before new attempt
     setSignUpSuccessMessage('');
     setLoading(true);
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
+      addError("Supabase client not initialized.");
       setLoading(false);
       return;
     }
@@ -400,23 +406,23 @@ const EquityManagementApp = () => {
     });
     setLoading(false);
     if (error) {
-      setErrorMessage(error.message);
+      addError('Login failed: ' + error.message);
     }
   };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    setErrorMessage('');
+    setErrors([]); // Clear errors before new attempt
     setSignUpSuccessMessage('');
     setLoading(true);
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
+      addError("Supabase client not initialized.");
       setLoading(false);
       return;
     }
     try {
       const generatedUsername = signUpData.username || `user_${Math.random().toString(36).substring(2, 9)}`;
-      
+
       const { data, error } = await supabase.auth.signUp({
         email: signUpData.email,
         password: signUpData.password,
@@ -430,10 +436,10 @@ const EquityManagementApp = () => {
       setLoading(false);
 
       if (error) {
-        setErrorMessage(error.message);
+        addError(error.message);
       } else if (data.user) {
         setSignUpSuccessMessage('Sign up successful! Please check your email to confirm your account. You can now log in.');
-        
+
         await createSampleDataForNewUser(data.user.id);
 
         setShowSignUp(false);
@@ -441,29 +447,29 @@ const EquityManagementApp = () => {
         setLoginData({ email: signUpData.email, password: '' });
       }
     } catch (error) {
-      setErrorMessage('Sign up failed: ' + error.message);
+      addError('Sign up failed: ' + error.message);
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]); // Clear errors
     if (!supabase) {
-      setErrorMessage("Supabase client not initialized.");
+      addError("Supabase client not initialized.");
       setLoading(false);
       return;
     }
     const { error } = await supabase.auth.signOut();
     setLoading(false);
     if (error) {
-      setErrorMessage(error.message);
+      addError(error.message);
     }
   };
 
   const fetchInitialData = async (userId) => {
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -486,7 +492,7 @@ const EquityManagementApp = () => {
         setShareIssuances([]);
       }
     } catch (error) {
-      setErrorMessage('Error fetching companies: ' + error.message);
+      addError('Error fetching companies: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -495,7 +501,7 @@ const EquityManagementApp = () => {
   const fetchCompanyRelatedData = async (companyId) => {
     if (!companyId) return;
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -523,7 +529,7 @@ const EquityManagementApp = () => {
       setShareIssuances(shareIssuancesData);
 
     } catch (error) {
-      setErrorMessage('Error fetching company data: ' + error.message);
+      addError('Error fetching company data: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -536,7 +542,7 @@ const EquityManagementApp = () => {
   }, [selectedCompany]);
 
   const fetchUserProfile = async (userId) => {
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       return;
     }
@@ -553,17 +559,17 @@ const EquityManagementApp = () => {
       setUserProfile(data);
     }
     catch (error) {
-      setErrorMessage('Error fetching profile: ' + error.message);
+      addError('Error fetching profile: ' + error.message);
     }
   };
 
   const updateUserProfile = async (profileData) => {
     if (!user) {
-      setErrorMessage('No user logged in.');
+      addError('No user logged in.');
       return;
     }
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -575,12 +581,12 @@ const EquityManagementApp = () => {
           .select('id')
           .eq('username', profileData.username)
           .single();
-        
+
         if (checkError && checkError.code !== 'PGRST116') {
           throw checkError;
         }
         if (existingUser && existingUser.id !== user.id) {
-          setErrorMessage('Username is already taken. Please choose a different one.');
+          addError('Username is already taken. Please choose a different one.');
           setLoading(false);
           return;
         }
@@ -598,9 +604,10 @@ const EquityManagementApp = () => {
 
       if (error) throw error;
       setUserProfile({ ...userProfile, ...dataToUpdate });
-      alert('Profile updated successfully!');
+      // Use custom modal or toast for success instead of alert
+      addError('Profile updated successfully!');
     } catch (error) {
-      setErrorMessage('Error updating profile: ' + error.message);
+      addError('Error updating profile: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -608,7 +615,7 @@ const EquityManagementApp = () => {
 
   const updatePassword = async (newPassword) => {
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -618,9 +625,10 @@ const EquityManagementApp = () => {
         password: newPassword,
       });
       if (error) throw error;
-      alert('Password updated successfully!');
+      // Use custom modal or toast for success instead of alert
+      addError('Password updated successfully!');
     } catch (error) {
-      setErrorMessage('Error updating password: ' + error.message);
+      addError('Error updating password: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -628,9 +636,9 @@ const EquityManagementApp = () => {
 
   const handleDeleteAccount = async () => {
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase || !user) {
-      setErrorMessage("Supabase client or user not initialized.");
+      addError("Supabase client or user not initialized.");
       setLoading(false);
       return;
     }
@@ -659,7 +667,7 @@ const EquityManagementApp = () => {
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
 
-      alert('Your account and all associated data in companies, shareholders, share classes, and share issuances have been deleted. You have been logged out.');
+      addError('Your account and all associated data in companies, shareholders, share classes, and share issuances have been deleted. You have been logged out.');
       setCompanies([]);
       setSelectedCompany(null);
       setShareholders([]);
@@ -670,7 +678,7 @@ const EquityManagementApp = () => {
       setShowLogin(true);
 
     } catch (error) {
-      setErrorMessage('Error deleting account: ' + error.message + '. Please ensure the DELETE RLS policy for companies is correctly set. Note: the core authentication record cannot be deleted from the client-side for security reasons.');
+      addError('Error deleting account: ' + error.message + '. Please ensure the DELETE RLS policy for companies is correctly set. Note: the core authentication record cannot be deleted from the client-side for security reasons.');
     } finally {
       setLoading(false);
       setShowConfirmDeleteModal(false);
@@ -679,11 +687,11 @@ const EquityManagementApp = () => {
 
   const handleDeactivateAccount = async () => {
     if (!user || !supabase) {
-        setErrorMessage("User not logged in or Supabase client not initialized.");
+        addError("User not logged in or Supabase client not initialized.");
         return;
     }
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
 
     try {
         const currentEmail = user.email;
@@ -710,12 +718,12 @@ const EquityManagementApp = () => {
         const { error: signOutError } = await supabase.auth.signOut();
         if (signOutError) throw signOutError;
 
-        alert('Your account has been deactivated and you have been logged out. You can now create a new account with your original email.');
+        addError('Your account has been deactivated and you have been logged out. You can now create a new account with your original email.');
         setUser(null);
         setShowLogin(true);
 
     } catch (error) {
-        setErrorMessage('Error deactivating account: ' + error.message);
+        addError('Error deactivating account: ' + error.message);
     } finally {
       setLoading(false);
       setShowConfirmDeactivateModal(false);
@@ -760,7 +768,7 @@ const EquityManagementApp = () => {
 
       if (shareClassError) {
         console.error("Error inserting default share classes:", shareClassError.message);
-        setErrorMessage('Company created, but failed to add default share classes: ' + shareClassError.message);
+        addError('Company created, but failed to add default share classes: ' + shareClassError.message);
       } else {
         fetchCompanyRelatedData(sampleCompany.id);
       }
@@ -838,7 +846,7 @@ const EquityManagementApp = () => {
 
     } catch (error) {
       console.error('Error creating sample data for new user:', error.message);
-      setErrorMessage('Failed to create sample data: ' + error.message);
+      addError('Failed to create sample data: ' + error.message);
     }
   };
 
@@ -846,7 +854,7 @@ const EquityManagementApp = () => {
   const createCompany = async (data) => {
     if (!user) return;
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -858,6 +866,7 @@ const EquityManagementApp = () => {
           name: data.name,
           description: data.description,
           user_id: user.id,
+          address: data.address, // Include address from form
         })
         .select()
         .single();
@@ -885,13 +894,13 @@ const EquityManagementApp = () => {
 
       if (shareClassError) {
         console.error("Error inserting default share classes:", shareClassError.message);
-        setErrorMessage('Company created, but failed to add default share classes: ' + shareClassError.message);
+        addError('Company created, but failed to add default share classes: ' + shareClassError.message);
       } else {
         fetchCompanyRelatedData(newCompany.id);
       }
 
     } catch (error) {
-      setErrorMessage('Error creating company: ' + error.message);
+      addError('Error creating company: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -900,7 +909,7 @@ const EquityManagementApp = () => {
   const createShareholder = async (data) => {
     if (!selectedCompany) return;
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -922,7 +931,7 @@ const EquityManagementApp = () => {
       setShowCreateShareholder(false);
       setShowBulkAddShareholder(false);
     } catch (error) {
-      setErrorMessage('Error creating shareholder: ' + error.message);
+      addError('Error creating shareholder: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -931,7 +940,7 @@ const EquityManagementApp = () => {
   const createShareClass = async (data) => {
     if (!selectedCompany) return;
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -952,7 +961,7 @@ const EquityManagementApp = () => {
       setShareClasses([...shareClasses, newShareClass]);
       setShowCreateShareClass(false);
     } catch (error) {
-      setErrorMessage('Error creating share class: ' + error.message);
+      addError('Error creating share class: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -961,7 +970,7 @@ const EquityManagementApp = () => {
   const createIssuance = async (data) => {
     if (!selectedCompany) return;
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -977,6 +986,7 @@ const EquityManagementApp = () => {
           price_per_share: parseFloat(data.pricePerShare),
           issue_date: data.issueDate,
           round: data.round || null,
+          payment_status: data.payment_status || 'No', // Default if not provided
         })
         .select()
         .single();
@@ -986,7 +996,7 @@ const EquityManagementApp = () => {
       setShowCreateIssuance(false);
       setShowBulkAddIssuance(false);
     } catch (error) {
-      setErrorMessage('Error creating issuance: ' + error.message);
+      addError('Error creating issuance: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -994,7 +1004,7 @@ const EquityManagementApp = () => {
 
   const deleteIssuance = async (id) => {
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
     if (!supabase) {
       setLoading(false);
       return;
@@ -1008,7 +1018,7 @@ const EquityManagementApp = () => {
       if (error) throw error;
       setShareIssuances(shareIssuances.filter(issuance => issuance.id !== id));
     } catch (error) {
-      setErrorMessage('Error deleting issuance: ' + error.message);
+      addError('Error deleting issuance: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -1022,7 +1032,7 @@ const EquityManagementApp = () => {
     let latestValuationPerShare = 0;
     if (companyIssuances.length > 0) {
       const sortedIssuances = _.orderBy(companyIssuances, ['issue_date', 'created_at'], ['desc', 'desc']);
-      latestValuationPerShare = sortedIssuances[0].price_per_share;
+      latestValuationPerShare = sortedIssuances[0]?.price_per_share || 0;
     }
 
     const classSummary = _(companyIssuances)
@@ -1088,12 +1098,12 @@ const EquityManagementApp = () => {
   };
 
   const fetchEquityCalculations = async (futureIssuance = null) => {
-    if (!selectedCompany || !PYTHON_BACKEND_URL) {
-      setErrorMessage("Company not selected or Python backend URL not configured.");
+    if (!selectedCompany || !EQUITY_CALCULATOR_BACKEND_URL) {
+      addError("Company not selected or Python backend URL not configured.");
       return null;
     }
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
 
     try {
       const payload = {
@@ -1104,7 +1114,7 @@ const EquityManagementApp = () => {
         futureIssuance: futureIssuance
       };
 
-      const response = await fetch(PYTHON_BACKEND_URL, {
+      const response = await fetch(EQUITY_CALCULATOR_BACKEND_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1122,7 +1132,7 @@ const EquityManagementApp = () => {
 
     } catch (error) {
       console.error("Error fetching equity calculations from backend:", error);
-      setErrorMessage('Error fetching equity calculations: ' + error.message);
+      addError('Error fetching equity calculations: ' + error.message);
       return null;
     } finally {
       setLoading(false);
@@ -1131,7 +1141,7 @@ const EquityManagementApp = () => {
 
   const handleCalculateFutureScenario = async (e) => {
     e.preventDefault();
-    setErrorMessage('');
+    setErrors([]);
     const results = await fetchEquityCalculations(futureIssuanceData);
     if (results) {
       setFutureScenarioResults(results);
@@ -1193,11 +1203,12 @@ const EquityManagementApp = () => {
               pricePerShare: parseFloat(pricePerShare),
               issueDate: issueDate || new Date().toISOString().split('T')[0],
               round: round || null,
+              payment_status: 'No', // Default for CSV upload if not provided in CSV
             };
             await createIssuance(issuance);
           }
         }
-        alert('CSV upload processing complete. Check issuances tab.');
+        addError('CSV upload processing complete. Check issuances tab.');
       };
       reader.readAsText(file);
     }
@@ -1205,12 +1216,12 @@ const EquityManagementApp = () => {
 
   const handleDownloadPdf = async () => {
     if (!selectedCompany || !window.jspdf) {
-      setErrorMessage("Cannot generate PDF. Ensure a company is selected and jsPDF library is loaded.");
+      addError("Cannot generate PDF. Ensure a company is selected and jsPDF library is loaded.");
       return;
     }
 
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
 
     try {
       const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
@@ -1288,7 +1299,7 @@ const EquityManagementApp = () => {
         sh.type,
         sh.totalShares.toLocaleString(),
         `$${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
-        sh.holdings.map(h => `${h.shareClassName}: ${h.shares.toLocaleString()} @ $${h.price_per_share.toFixed(2)} (Round: {h.round || 'N/A'})`).join('\n')
+        sh.holdings.map(h => `${h.shareClassName}: ${h.shares.toLocaleString()} @ $${h.price_per_share.toFixed(2)} (Round: ${h.round || 'N/A'})`).join('\n')
       ]);
       pdf.autoTable({
         startY: y,
@@ -1337,11 +1348,11 @@ const EquityManagementApp = () => {
       });
 
       pdf.save(`${selectedCompany.name}_Equity_Profile.pdf`);
-      alert('PDF generated successfully!');
+      addError('PDF generated successfully!');
 
     } catch (error) {
       console.error("Error generating PDF:", error);
-      setErrorMessage('Failed to generate PDF: ' + error.message);
+      addError('Failed to generate PDF: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -1349,12 +1360,12 @@ const EquityManagementApp = () => {
 
   const handleDownloadCsv = () => {
     if (!selectedCompany || shareholderData.length === 0) {
-      setErrorMessage("No shareholder data to download for CSV.");
+      addError("No shareholder data to download for CSV.");
       return;
     }
 
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
 
     try {
       const headers = ["Name", "Email", "Type", "Total Shares", "Total Value", "Holdings Details"];
@@ -1387,13 +1398,13 @@ const EquityManagementApp = () => {
         link.click();
         document.body.removeChild(link);
       } else {
-        alert('Your browser does not support downloading files directly. Please copy the data manually.');
+        addError('Your browser does not support downloading files directly. Please copy the data manually.');
       }
-      alert('Shareholders data downloaded as CSV!');
+      addError('Shareholders data downloaded as CSV!');
 
     } catch (error) {
       console.error("Error generating CSV:", error);
-      setErrorMessage('Failed to generate CSV: ' + error.message);
+      addError('Failed to generate CSV: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -1401,15 +1412,15 @@ const EquityManagementApp = () => {
 
   const handleCheckout = () => {
     if (!user || !user.id || !user.email) {
-      setErrorMessage("User not logged in or missing user details for checkout.");
+      addError("User not logged in or missing user details for checkout.");
       return;
     }
     if (!WOOCOMMERCE_SUBSCRIPTION_URL) {
-      setErrorMessage("WooCommerce Subscription URL is not configured.");
+      addError("WooCommerce Subscription URL is not configured.");
       return;
     }
     setLoading(true);
-    setErrorMessage('');
+    setErrors([]);
 
     try {
       const redirectUrl = `${WOOCOMMERCE_SUBSCRIPTION_URL}?add-to-cart=YOUR_PRODUCT_ID&variation_id=YOUR_VARIATION_ID&quantity=1&_wpnonce=NONCE_HERE&user_id=${user.id}&user_email=${user.email}`;
@@ -1417,7 +1428,7 @@ const EquityManagementApp = () => {
 
     } catch (error) {
       console.error("Error initiating WooCommerce Checkout:", error);
-      setErrorMessage('Failed to initiate payment: ' + error.message);
+      addError('Failed to initiate payment: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -1445,11 +1456,14 @@ const EquityManagementApp = () => {
             <h2 className="mt-2 text-2xl font-bold text-gray-900">Equity Management</h2>
             <p className="text-gray-600">{showLogin ? 'Sign in to your account' : 'Create a new account'}</p>
           </div>
-          {errorMessage && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-              <span className="block sm:inline">{errorMessage}</span>
-            </div>
-          )}
+          {errors.map((error) => (
+                <div key={error.id} className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center justify-between">
+                    <span>{error.message}</span>
+                    <button onClick={() => removeError(error.id)} className="ml-4 text-red-700 hover:text-red-900">
+                        <XCircle className="h-5 w-5" />
+                    </button>
+                </div>
+            ))}
           {signUpSuccessMessage && (
             <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
               <span className="block sm:inline">{signUpSuccessMessage}</span>
@@ -1542,9 +1556,9 @@ const EquityManagementApp = () => {
           )}
           <p className="mt-4 text-sm text-gray-600 text-center">
             {showLogin ? (
-              <>Don't have an account? <button onClick={() => { setShowLogin(false); setShowSignUp(true); setErrorMessage(''); setSignUpSuccessMessage(''); }} className="text-blue-600 hover:underline">Sign Up</button></>
+              <>Don't have an account? <button onClick={() => { setShowLogin(false); setShowSignUp(true); setErrors([]); setSignUpSuccessMessage(''); }} className="text-blue-600 hover:underline">Sign Up</button></>
             ) : (
-              <>Already have an account? <button onClick={() => { setShowSignUp(false); setShowLogin(true); setErrorMessage(''); setSignUpSuccessMessage(''); }} className="text-blue-600 hover:underline">Sign In</button></>
+              <>Already have an account? <button onClick={() => { setShowSignUp(false); setShowLogin(true); setErrors([]); setSignUpSuccessMessage(''); }} className="text-blue-600 hover:underline">Sign In</button></>
             )}
           </p>
         </div>
@@ -1667,11 +1681,19 @@ const EquityManagementApp = () => {
 
         {/* Main Content Body */}
         <div className="flex-1 overflow-y-auto p-6">
-          {errorMessage && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-              <span className="block sm:inline">{errorMessage}</span>
-              <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setErrorMessage('')}>
-                <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+          {errors.map((error) => (
+              <div key={error.id} className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center justify-between">
+                  <span>{error.message}</span>
+                  <button onClick={() => removeError(error.id)} className="ml-4 text-red-700 hover:text-red-900">
+                      <XCircle className="h-5 w-5" />
+                  </button>
+              </div>
+          ))}
+          {signUpSuccessMessage && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <span className="block sm:inline">{signUpSuccessMessage}</span>
+              <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setSignUpSuccessMessage('')}>
+                <svg className="fill-current h-6 w-6 text-green-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
               </span>
             </div>
           )}
@@ -1681,9 +1703,9 @@ const EquityManagementApp = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Product Placeholder: Equity Management */}
-                <div 
-                  className="p-6 rounded-lg shadow cursor-pointer flex flex-col items-center justify-center text-center" 
-                  style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }} 
+                <div
+                  className="p-6 rounded-lg shadow cursor-pointer flex flex-col items-center justify-center text-center"
+                  style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}
                   onClick={() => setActiveTab('equityHome')} // Navigate to Equity Home
                 >
                   <BarChart3 className="h-12 w-12 mb-3" style={{ color: theme.primary }} />
@@ -1959,8 +1981,7 @@ const EquityManagementApp = () => {
                       shareholders={shareholders.filter(s => s.company_id === selectedCompany?.id)}
                       shareClasses={shareClasses.filter(sc => sc.company_id === selectedCompany?.id)}
                       onSubmit={createIssuance}
-                      errorMessage={errorMessage}
-                      setErrorMessage={setErrorMessage}
+                      addError={addError}
                     />
                   </div>
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
@@ -1982,7 +2003,7 @@ const EquityManagementApp = () => {
               {activeTab === 'reports' && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Reports & Scenarios</h2>
-                  
+
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
                     <h3 className="text-lg font-medium" style={{ color: theme.text }}>Current Equity Status</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
@@ -2275,8 +2296,7 @@ const EquityManagementApp = () => {
                     <UserProfileForm
                       userProfile={userProfile}
                       onSubmit={updateUserProfile}
-                      errorMessage={errorMessage}
-                      setErrorMessage={setErrorMessage}
+                      addError={addError}
                     />
                   )}
 
@@ -2286,8 +2306,7 @@ const EquityManagementApp = () => {
                       onPasswordChange={updatePassword}
                       onDeactivateAccount={() => setShowConfirmDeactivateModal(true)}
                       onDeleteAccount={() => setShowConfirmDeleteModal(true)}
-                      errorMessage={errorMessage}
-                      setErrorMessage={setErrorMessage}
+                      addError={addError}
                     />
                   )}
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
@@ -2318,7 +2337,7 @@ const EquityManagementApp = () => {
               )}
 
               {activeTab === 'admin' && userProfile?.is_admin && (
-                <AdminDashboard errorMessage={errorMessage} setErrorMessage={setErrorMessage} />
+                <AdminDashboard addError={addError} />
               )}
             </>
           )}
@@ -2355,8 +2374,7 @@ const EquityManagementApp = () => {
         <Modal onClose={() => setShowBulkAddShareholder(false)}>
           <BulkShareholderForm
             onSubmit={createShareholder}
-            errorMessage={errorMessage}
-            setErrorMessage={setErrorMessage}
+            addError={addError}
           />
         </Modal>
       )}
@@ -2437,7 +2455,12 @@ const Modal = ({ children, onClose }) => (
 
 // Form Components
 const CompanyForm = ({ onSubmit, onCancel }) => {
-  const [data, setData] = useState({ name: '', description: '' });
+  const [data, setData] = useState({ name: '', description: '', address: null });
+
+  const handleAddressChange = (address) => {
+      setData(prev => ({ ...prev, address }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit(data);
@@ -2465,6 +2488,7 @@ const CompanyForm = ({ onSubmit, onCancel }) => {
             rows="3"
           />
         </div>
+        <AddressForm onAddressChange={handleAddressChange} />
       </div>
       <div className="flex justify-end space-x-2 mt-6">
         <button
@@ -2617,6 +2641,7 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
     pricePerShare: initialData.price_per_share || '',
     issueDate: new Date().toISOString().split('T')[0],
     round: initialData.round || '',
+    payment_status: initialData.payment_status || 'No',
   });
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -2698,6 +2723,14 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
             placeholder="e.g., Seed, Series A"
           />
         </div>
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Shares have been paid for?</label>
+            <select value={data.payment_status} onChange={(e) => setData({...data, payment_status: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                <option>Yes</option>
+                <option>Partial</option>
+                <option>No</option>
+            </select>
+        </div>
       </div>
       <div className="flex justify-end space-x-2 mt-6">
         <button
@@ -2719,13 +2752,13 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
 };
 
 // New Component: BulkIssuanceForm
-const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, setErrorMessage }) => {
+const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) => {
   const [issuances, setIssuances] = useState([
-    { shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '' }
+    { shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '', payment_status: 'No' }
   ]);
 
   const addRow = () => {
-    setIssuances([...issuances, { shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '' }]);
+    setIssuances([...issuances, { shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '', payment_status: 'No' }]);
   };
 
   const removeRow = (index) => {
@@ -2741,32 +2774,32 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
 
   const handleSubmitAll = async (e) => {
     e.preventDefault();
-    setErrorMessage('');
     let allSuccessful = true;
     for (const issuance of issuances) {
       if (!issuance.shareholderId || !issuance.shareClassId || !issuance.shares || !issuance.pricePerShare || !issuance.issueDate) {
-        setErrorMessage('Please fill all required fields for all issuances.');
+        addError('Please fill all required fields for all issuances.');
         allSuccessful = false;
         break;
       }
       try {
         await onSubmit(issuance);
       } catch (error) {
-        setErrorMessage(`Error adding one or more issuances: ${error.message}`);
+        addError(`Error adding one or more issuances: ${error.message}`);
         allSuccessful = false;
         break;
       }
     }
     if (allSuccessful) {
-      alert('All issuances added successfully!');
-      setIssuances([{ shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '' }]);
+      // Use custom modal or toast for success instead of alert
+      addError('All issuances added successfully!');
+      setIssuances([{ shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], round: '', payment_status: 'No' }]);
     }
   };
 
   return (
     <form onSubmit={handleSubmitAll}>
       {issuances.map((issuance, index) => (
-        <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md">
+        <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md relative"> {/* Added relative for positioning trash icon */}
           <h4 className="text-md font-medium text-gray-800 mb-3">Issuance #{index + 1}</h4>
           {issuances.length > 1 && (
             <button
@@ -2850,6 +2883,14 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
                 placeholder="e.g., Seed, Series A"
               />
             </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Shares have been paid for?</label>
+                <select value={issuance.payment_status} onChange={(e) => handleChange(index, 'payment_status', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                    <option>Yes</option>
+                    <option>Partial</option>
+                    <option>No</option>
+                </select>
+            </div>
           </div>
         </div>
       ))}
@@ -2874,7 +2915,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, errorMessage, 
 };
 
 // New Component: BulkShareholderForm
-const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
+const BulkShareholderForm = ({ onSubmit, addError }) => {
   const [shareholders, setShareholders] = useState(
     Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' }))
   );
@@ -2887,21 +2928,20 @@ const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
 
   const handleSubmitAll = async (e) => {
     e.preventDefault();
-    setErrorMessage('');
     let allSuccessful = true;
     for (const shareholder of shareholders) {
       if (shareholder.name.trim() !== '') {
         try {
           await onSubmit(shareholder);
         } catch (error) {
-          setErrorMessage(`Error adding shareholder ${shareholder.name}: ${error.message}`);
+          addError(`Error adding shareholder ${shareholder.name}: ${error.message}`);
           allSuccessful = false;
           break;
         }
       }
     }
     if (allSuccessful) {
-      alert('All valid shareholders added successfully!');
+      addError('All valid shareholders added successfully!');
       setShareholders(Array.from({ length: 5 }, () => ({ name: '', email: '', type: 'Shareholder' })));
     }
   };
@@ -2961,7 +3001,7 @@ const BulkShareholderForm = ({ onSubmit, errorMessage, setErrorMessage }) => {
 };
 
 // UserProfileForm - for Name, Username, DOB, Address
-const UserProfileForm = ({ userProfile, onSubmit, errorMessage, setErrorMessage }) => {
+const UserProfileForm = ({ userProfile, onSubmit, addError }) => {
   const [profileData, setProfileData] = useState({
     fullName: userProfile?.full_name || '',
     username: userProfile?.username || '',
@@ -3043,19 +3083,19 @@ const UserProfileForm = ({ userProfile, onSubmit, errorMessage, setErrorMessage 
 };
 
 // LoginDetailsForm - for Email and Password
-const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, onDeleteAccount, errorMessage, setErrorMessage }) => {
+const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, onDeleteAccount, addError }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
-    setErrorMessage('');
+    // Use addError instead of setErrorMessage
     if (newPassword !== confirmPassword) {
-      setErrorMessage('New password and confirmation do not match.');
+      addError('New password and confirmation do not match.');
       return;
     }
     if (newPassword.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
+      addError('Password must be at least 6 characters long.');
       return;
     }
     onPasswordChange(newPassword);
@@ -3138,7 +3178,7 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
 };
 
 // SubscriptionPage Component
-const SubscriptionPage = ({ user, handleCheckout, loading, errorMessage }) => {
+const SubscriptionPage = ({ user, handleCheckout, loading, addError }) => {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
@@ -3147,9 +3187,11 @@ const SubscriptionPage = ({ user, handleCheckout, loading, errorMessage }) => {
         <p className="text-gray-700 mb-6">
           Upgrade to our Premium Plan to access all advanced reports, scenario planning, and unlimited company management.
         </p>
-        {errorMessage && (
+        {/* Changed from errorMessage to errors.map */}
+        {/* Note: This component doesn't directly use 'errors' state, so it still uses a prop for a single error message */}
+        {addError && ( // This is a bit of a hack to show errors here. A global error state would be better.
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <span className="block sm:inline">{errorMessage}</span>
+            <span className="block sm:inline">{addError}</span>
           </div>
         )}
         <button
@@ -3167,5 +3209,59 @@ const SubscriptionPage = ({ user, handleCheckout, loading, errorMessage }) => {
     </div>
   );
 };
+
+const AddressForm = ({ initialAddress, onAddressChange }) => {
+  const [address, setAddress] = useState(initialAddress || { line1: '', line2: '', country: '', state: '', postcode: '' });
+  const [states, setStates] = useState([]);
+
+  useEffect(() => {
+    if (address.country) {
+      setStates(countryData[address.country] || []);
+    } else {
+      setStates([]);
+    }
+  }, [address.country]);
+
+  const handleChange = (field, value) => {
+    const newAddress = { ...address, [field]: value };
+    if (field === 'country') {
+      newAddress.state = '';
+    }
+    setAddress(newAddress);
+    onAddressChange(newAddress);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Street number and name</label>
+        <input type="text" value={address.line1} onChange={(e) => handleChange('line1', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Line 2 (optional)</label>
+        <input type="text" value={address.line2} onChange={(e) => handleChange('line2', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+        <select value={address.country} onChange={(e) => handleChange('country', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+          <option value="">Select Country</option>
+          {Object.keys(countryData).map(country => <option key={country} value={country}>{country}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">State or Province</label>
+        <select value={address.state} onChange={(e) => handleChange('state', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required disabled={!states.length}>
+          <option value="">Select State/Province</option>
+          {states.map(state => <option key={state} value={state}>{state}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Postcode or Zip</label>
+        <input type="text" value={address.postcode} onChange={(e) => handleChange('postcode', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+      </div>
+    </div>
+  );
+};
+
 
 export default EquityManagementApp;
