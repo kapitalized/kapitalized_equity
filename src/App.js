@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
-import { createClient } from '@supabase/supabase-js'; // Import createClient
+// import { createClient } from '@supabase/supabase-js'; // Removed direct import
 
 // IMPORTANT: URL for the main equity calculation FastAPI endpoint
 const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
@@ -137,8 +137,8 @@ const AdminDashboard = ({ addError }) => {
 
   return (
     <div className="space-y-6">
+      <h2 className="text-xl font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Admin Dashboard</h2>
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Admin Dashboard</h2>
         <div className="flex items-center space-x-2">
           <button onClick={() => setCurrentView('users')} className={`px-4 py-2 text-sm font-medium rounded-md ${currentView === 'users' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Users</button>
           <button onClick={() => setCurrentView('companies')} className={`px-4 py-2 text-sm font-medium rounded-md ${currentView === 'companies' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Companies</button>
@@ -153,6 +153,7 @@ const AdminDashboard = ({ addError }) => {
         {/* Render tables based on currentView */}
         {currentView === 'users' && (
             <div className="overflow-x-auto">
+                <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Users</h3>
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -181,6 +182,7 @@ const AdminDashboard = ({ addError }) => {
         )}
         {currentView === 'companies' && (
             <div className="overflow-x-auto">
+                <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Companies</h3>
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -209,6 +211,7 @@ const AdminDashboard = ({ addError }) => {
         )}
         {currentView === 'issuances' && (
             <div className="overflow-x-auto">
+                <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Issuances</h3>
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -307,7 +310,7 @@ const EquityManagementApp = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && !supabase) { // Check if window is defined and supabase is not already initialized
       try {
-        supabase = createClient(supabaseUrl, supabaseAnonKey);
+        supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey); // Use window.supabase
         console.log("Supabase client initialized.");
       } catch (e) {
         addError("Failed to initialize Supabase client: " + e.message);
@@ -1453,7 +1456,7 @@ const EquityManagementApp = () => {
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
           <div className="text-center mb-6">
             <Building2 className="mx-auto h-12 w-12 text-blue-600" />
-            <h2 className="mt-2 text-2xl font-bold text-gray-900">Equity Management</h2>
+            <h2 className="mt-2 text-2xl font-bold text-gray-900" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Equity Management</h2>
             <p className="text-gray-600">{showLogin ? 'Sign in to your account' : 'Create a new account'}</p>
           </div>
           {errors.map((error) => (
@@ -1615,65 +1618,72 @@ const EquityManagementApp = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
               <div className="flex items-center">
-                {selectedCompany && activeTab !== 'productSelect' && ( // Only show company name if not on product select page
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>{selectedCompany.name}</h1>
-                )}
+                {/* Page Title */}
                 {activeTab === 'productSelect' && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Product Selection</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Product Selection</h1>
                 )}
                 {activeTab === 'equityHome' && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Equity Home</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Home</h1>
                 )}
                 {activeTab === 'shareholders' && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Shareholders</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholders</h1>
                 )}
                 {activeTab === 'issuances' && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Share Issuances</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Issuances</h1>
                 )}
                 {activeTab === 'bulk-add' && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Bulk Add Shares</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Bulk Add Shares</h1>
                 )}
                 {activeTab === 'reports' && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Reports & Scenarios</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Reports & Scenarios</h1>
                 )}
                 {activeTab === 'futureScenario' && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Future Scenario</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Future Scenario</h1>
                 )}
                 {activeTab === 'admin' && userProfile?.is_admin && (
-                  <h1 className="text-xl font-semibold" style={{ color: theme.text }}>Admin Dashboard</h1>
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Admin Dashboard</h1>
+                )}
+                {activeTab === 'account' && (
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>My Account</h1>
                 )}
               </div>
-              {/* User Account Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)}
-                  className="flex items-center text-sm" style={{ color: theme.lightText }}
-                >
-                  <User className="h-5 w-5 mr-1" />
-                  {userProfile?.username || user?.email || 'My Account'} <ChevronDown className="ml-1 h-4 w-4" />
-                </button>
-                {showLoginDetailsDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                    <button
-                      onClick={() => { setActiveTab('account'); setMyAccountSubTab('profile'); setShowLoginDetailsDropdown(false); }}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      Profile
-                    </button>
-                    <button
-                      onClick={() => { setActiveTab('account'); setMyAccountSubTab('loginDetails'); setShowLoginDetailsDropdown(false); }}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      Login Details
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
-                    >
-                      Logout
-                    </button>
-                  </div>
+
+              {/* Active Company Name and User Account Dropdown */}
+              <div className="flex items-center space-x-4">
+                {selectedCompany && activeTab !== 'productSelect' && (
+                  <span className="text-sm font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.lightText }}>{selectedCompany.name}</span>
                 )}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowLoginDetailsDropdown(!showLoginDetailsDropdown)}
+                    className="flex items-center text-sm" style={{ color: theme.lightText }}
+                  >
+                    <User className="h-5 w-5 mr-1" />
+                    {userProfile?.username || user?.email || 'My Account'} <ChevronDown className="ml-1 h-4 w-4" />
+                  </button>
+                  {showLoginDetailsDropdown && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
+                      <button
+                        onClick={() => { setActiveTab('account'); setMyAccountSubTab('profile'); setShowLoginDetailsDropdown(false); }}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                      >
+                        Profile
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('account'); setMyAccountSubTab('loginDetails'); setShowLoginDetailsDropdown(false); }}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                      >
+                        Login Details
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1709,20 +1719,20 @@ const EquityManagementApp = () => {
                   onClick={() => setActiveTab('equityHome')} // Navigate to Equity Home
                 >
                   <BarChart3 className="h-12 w-12 mb-3" style={{ color: theme.primary }} />
-                  <h3 className="text-lg font-medium" style={{ color: theme.primary }}>Equity Management</h3>
+                  <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.primary }}>Equity Management</h3>
                   <p className="text-sm" style={{ color: theme.lightText }}>Manage your company's cap table and issuances.</p>
                 </div>
                 {/* Product Placeholder: Valuations */}
                 <div className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center" style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}>
                   <Download className="h-12 w-12 mb-3" style={{ color: theme.lightText }} />
-                  <h3 className="text-lg font-medium" style={{ color: theme.text }}>Valuations</h3>
+                  <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Valuations</h3>
                   <p className="text-sm" style={{ color: theme.lightText }}>Analyze company valuations and financial models.</p>
                   <p className="mt-2 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
                 </div>
                 {/* Product Placeholder: Dataroom */}
                 <div className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center" style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}>
                   <Upload className="h-12 w-12 mb-3" style={{ color: theme.lightText }} />
-                  <h3 className="text-lg font-medium" style={{ color: theme.text }}>Dataroom</h3>
+                  <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Dataroom</h3>
                   <p className="text-sm" style={{ color: theme.lightText }}>Securely share documents with investors and advisors.</p>
                   <p className="mt-2 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
                 </div>
@@ -1768,26 +1778,26 @@ const EquityManagementApp = () => {
                   {/* Page Title Handled by main header */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Total Shares Outstanding</h3>
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Total Shares Outstanding</h3>
                       <p className="text-3xl font-bold" style={{ color: theme.primary }}>{companyData.totalShares.toLocaleString()}</p>
                     </div>
                     <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Total Equity Value (Sum of issuances)</h3>
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Total Equity Value (Sum of issuances)</h3>
                       <p className="text-3xl font-bold" style={{ color: theme.secondary }}>${companyData.totalValue.toLocaleString()}</p>
                     </div>
                     <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Latest Valuation per Share</h3>
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Latest Valuation per Share</h3>
                       <p className="text-3xl font-bold" style={{ color: theme.primary }}>${companyData.latestValuationPerShare.toFixed(2)}</p>
                     </div>
                     <div className="p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Company Valuation (Total Shares x Latest Price)</h3>
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Company Valuation (Total Shares x Latest Price)</h3>
                       <p className="text-3xl font-bold" style={{ color: theme.accent }}>${companyData.companyValuation.toLocaleString()}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-white p-6 rounded-lg shadow" ref={pieChartRef} style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="text-lg font-medium" style={{ color: theme.text }}>Share Distribution by Class</h3>
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Distribution by Class</h3>
                       <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                           <Pie
@@ -1809,7 +1819,7 @@ const EquityManagementApp = () => {
                       </ResponsiveContainer>
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                      <h3 className="lg:text-lg font-medium" style={{ color: theme.text }}>Share Classes (by Priority)</h3>
+                      <h3 className="lg:text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Classes (by Priority)</h3>
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
                           <thead style={{ backgroundColor: theme.background }}>
@@ -1841,7 +1851,7 @@ const EquityManagementApp = () => {
 
               {activeTab === 'shareholders' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Shareholders</h2>
+                  <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholders</h2>
                   <div className="flex justify-between items-center">
                     <div className="flex space-x-2">
                       <button
@@ -1909,9 +1919,9 @@ const EquityManagementApp = () => {
 
               {activeTab === 'issuances' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Share Issuances</h2>
+                  <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Issuances</h2>
                   <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold" style={{ color: theme.text }}>Share Issuances</h2>
+                    <h2 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Issuances</h2>
                     <button
                       onClick={() => setShowCreateIssuance(true)}
                       className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
@@ -1971,9 +1981,9 @@ const EquityManagementApp = () => {
 
               {activeTab === 'bulk-add' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Bulk Add Shares</h2>
+                  <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Bulk Add Shares</h2>
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Add Multiple Share Issuances</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Add Multiple Share Issuances</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       Manually add multiple rows of share issuances. Select a shareholder and then add their shares.
                     </p>
@@ -1985,7 +1995,7 @@ const EquityManagementApp = () => {
                     />
                   </div>
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Upload CSV File (Advanced)</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Upload CSV File (Advanced)</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       CSV format: <code className="font-mono">shareholderName, shareClassName, shares, pricePerShare, issueDate, round</code>
                     </p>
@@ -2002,10 +2012,10 @@ const EquityManagementApp = () => {
 
               {activeTab === 'reports' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>Reports & Scenarios</h2>
+                  <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Reports & Scenarios</h2>
 
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Current Equity Status</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Equity Status</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       View the current equity distribution and valuation.
                     </p>
@@ -2018,10 +2028,10 @@ const EquityManagementApp = () => {
                     </button>
                     {selectedRound === 'current' && (
                       <div className="mt-4">
-                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Current Company Overview:</h4>
+                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Company Overview:</h4>
                         <p style={{ color: theme.lightText }}>Total Shares: {companyData.totalShares.toLocaleString()}</p>
                         <p style={{ color: theme.lightText }}>Total Value: ${companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Current Shareholder Holdings:</h4>
+                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Shareholder Holdings:</h4>
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
                             <thead style={{ backgroundColor: theme.background }}>
@@ -2051,7 +2061,7 @@ const EquityManagementApp = () => {
                   </div>
 
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Historical Rounds Analysis</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Historical Rounds Analysis</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       Analyze equity distribution and valuation at specific past issuance rounds.
                     </p>
@@ -2068,10 +2078,10 @@ const EquityManagementApp = () => {
                     </select>
                     {selectedRound !== 'current' && selectedRound !== '' && (
                       <div className="mt-4">
-                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Equity Status at {selectedRound}:</h4>
+                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Status at {selectedRound}:</h4>
                         <p style={{ color: theme.lightText }}>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
                         <p style={{ color: theme.lightText }}>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h4 className="font-semibold mt-2" style={{ color: theme.text }}>Shareholder Holdings at {selectedRound}:</h4>
+                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Holdings at {selectedRound}:</h4>
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
                             <thead style={{ backgroundColor: theme.background }}>
@@ -2101,7 +2111,7 @@ const EquityManagementApp = () => {
                   </div>
 
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Company Profile Report (PDF)</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Company Profile Report (PDF)</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
                     </p>
@@ -2115,7 +2125,7 @@ const EquityManagementApp = () => {
                     </button>
                   </div>
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Shareholders Data (CSV)</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholders Data (CSV)</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       Download a CSV file containing all shareholder details for the selected company.
                     </p>
@@ -2132,7 +2142,7 @@ const EquityManagementApp = () => {
               )}
                {activeTab === 'futureScenario' && (
                 <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Future Scenario Planning</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Future Scenario Planning</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       Input a hypothetical future issuance to see its impact on current equity distribution. This does not affect your current shares, it is only for planning purposes.
                     </p>
@@ -2215,27 +2225,27 @@ const EquityManagementApp = () => {
                     </form>
                     {futureScenarioResults && (
                       <div className="mt-6 p-4 rounded-lg border" style={{ backgroundColor: theme.background, borderColor: theme.borderColor }}>
-                        <h4 className="text-lg font-semibold mb-3" style={{ color: theme.text }}>Future Scenario Results:</h4>
+                        <h4 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Future Scenario Results:</h4>
                         <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
-                                <p className="font-semibold" style={{ color: theme.text }}>Total Current Shares:</p>
+                                <p className="font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Total Current Shares:</p>
                                 <p style={{ color: theme.lightText }}>{futureScenarioResults.current_state.totalShares.toLocaleString()}</p>
                             </div>
                             <div>
-                                <p className="font-semibold" style={{ color: theme.text }}>Total Future Shares:</p>
+                                <p className="font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Total Future Shares:</p>
                                 <p style={{ color: theme.lightText }}>{futureScenarioResults.future_state.totalShares.toLocaleString()}</p>
                             </div>
                              <div>
-                                <p className="font-semibold" style={{ color: theme.text }}>Total Current Value:</p>
+                                <p className="font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Total Current Value:</p>
                                 <p style={{ color: theme.lightText }}>${futureScenarioResults.current_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                             </div>
                              <div>
-                                <p className="font-semibold" style={{ color: theme.text }}>Total Future Value:</p>
+                                <p className="font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Total Future Value:</p>
                                 <p style={{ color: theme.lightText }}>${futureScenarioResults.future_state.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                             </div>
                         </div>
 
-                        <h5 className="font-semibold mt-3" style={{ color: theme.text }}>Shareholder Impact:</h5>
+                        <h5 className="font-bold mt-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Impact:</h5>
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
                             <thead style={{ backgroundColor: theme.cardBackground }}>
@@ -2264,7 +2274,7 @@ const EquityManagementApp = () => {
               )}
               {activeTab === 'account' && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-semibold" style={{ color: theme.text }}>My Account</h2>
+                  <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>My Account</h2>
                   <div className="mb-6 border-b" style={{ borderColor: theme.borderColor }}>
                     <nav className="-mb-px flex space-x-8">
                       <button
@@ -2310,7 +2320,7 @@ const EquityManagementApp = () => {
                     />
                   )}
                   <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-medium" style={{ color: theme.text }}>Subscription Status</h3>
+                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Subscription Status</h3>
                     <p className="text-sm" style={{ color: theme.lightText }}>
                       Current Status: <span className={`font-semibold ${isPremiumUser ? 'text-green-600' : 'text-red-600'}`}>
                         {userProfile?.subscription_status ? userProfile.subscription_status.toUpperCase() : 'FREE'}
@@ -2381,7 +2391,7 @@ const EquityManagementApp = () => {
       {showConfirmDeleteModal && (
         <Modal onClose={() => setShowConfirmDeleteModal(false)}>
           <div className="p-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Account Deletion</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Confirm Account Deletion</h3>
             <p className="text-gray-700 mb-6">
               Are you sure you want to delete your account? This will delete **all** your companies, shareholders, share classes, and share issuances. This action cannot be undone.
             </p>
@@ -2407,7 +2417,7 @@ const EquityManagementApp = () => {
       {showConfirmDeactivateModal && (
         <Modal onClose={() => setShowConfirmDeactivateModal(false)}>
           <div className="p-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Account Deactivation</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Confirm Account Deactivation</h3>
             <p className="text-gray-700 mb-6">
               Are you sure you want to deactivate your account? Your email will be changed to free it up for new sign-ups, and your profile status will be set to 'inactive'. You will be logged out.
             </p>
@@ -2467,7 +2477,7 @@ const CompanyForm = ({ onSubmit, onCancel }) => {
   };
   return (
     <form onSubmit={handleSubmit}>
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Company</h3>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Create New Company</h3>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
@@ -2517,7 +2527,7 @@ const ShareholderForm = ({ onSubmit, onCancel }) => {
   };
   return (
     <form onSubmit={handleSubmit}>
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Shareholder</h3>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Add New Shareholder</h3>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -2580,7 +2590,7 @@ const ShareClassForm = ({ onSubmit, onCancel }) => {
   };
   return (
     <form onSubmit={handleSubmit}>
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Create Share Class</h3>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Create Share Class</h3>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Class Name</label>
@@ -2650,7 +2660,7 @@ const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialD
 
   return (
     <form onSubmit={handleSubmit}>
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Record Share Issuance</h3>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Record Share Issuance</h3>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder</label>
@@ -2800,7 +2810,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
     <form onSubmit={handleSubmitAll}>
       {issuances.map((issuance, index) => (
         <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md relative"> {/* Added relative for positioning trash icon */}
-          <h4 className="text-md font-medium text-gray-800 mb-3">Issuance #{index + 1}</h4>
+          <h4 className="text-md font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Issuance #{index + 1}</h4>
           {issuances.length > 1 && (
             <button
               type="button"
@@ -2950,7 +2960,7 @@ const BulkShareholderForm = ({ onSubmit, addError }) => {
     <form onSubmit={handleSubmitAll}>
       {shareholders.map((shareholder, index) => (
         <div key={index} className="mb-4 p-4 border border-gray-200 rounded-md">
-          <h4 className="text-md font-medium text-gray-800 mb-3">Shareholder #{index + 1}</h4>
+          <h4 className="text-md font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder #{index + 1}</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -3030,7 +3040,7 @@ const UserProfileForm = ({ userProfile, onSubmit, addError }) => {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Profile Details</h3>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Profile Details</h3>
       <form onSubmit={handleProfileSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
@@ -3106,7 +3116,7 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Login Information</h3>
+        <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Login Information</h3>
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">Email (Cannot be changed directly)</label>
           <input
@@ -3149,7 +3159,7 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Account Actions</h3>
+        <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Account Actions</h3>
         <p className="text-sm text-gray-600 mb-4">
           Deactivate your account to free up your email for new sign-ups, or permanently delete your account and all associated company data.
         </p>
@@ -3183,7 +3193,7 @@ const SubscriptionPage = ({ user, handleCheckout, loading, addError }) => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
         <CreditCard className="mx-auto h-16 w-16 text-blue-600 mb-4" />
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">Unlock Premium Features</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Unlock Premium Features</h2>
         <p className="text-gray-700 mb-6">
           Upgrade to our Premium Plan to access all advanced reports, scenario planning, and unlimited company management.
         </p>
