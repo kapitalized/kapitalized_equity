@@ -3,8 +3,6 @@ import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, Lo
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 
-if (error) return <div>Error loading companies: {error.message}</div>;
-
 // IMPORTANT: Replace with the URL of your Vercel Serverless Function
 const PYTHON_BACKEND_URL = "/api/equity-calculator";
 // IMPORTANT: Replace with your WooCommerce Subscription Product URL
