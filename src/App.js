@@ -22,7 +22,7 @@ const theme = {
 
 // Supabase client initialization
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
+const supabaseAnonKey = "eyJhbGciOiJIUzIM4InR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
 
 let supabase = null;
 if (typeof window !== 'undefined' && window.supabase) {
@@ -214,7 +214,6 @@ const EquityManagementApp = () => {
     setUserProfile(null);
   };
 
-  // --- FIX: Re-added missing function definitions ---
   const fetchInitialData = async (userId) => {
     setLoading(true);
     setErrorMessage('');
@@ -270,7 +269,6 @@ const EquityManagementApp = () => {
         setErrorMessage('Error fetching profile: ' + error.message);
     }
   };
-  // --- END OF FIX ---
 
   const updateUserEmail = async (newEmail) => {
     setLoading(true);
@@ -301,7 +299,10 @@ const EquityManagementApp = () => {
         address: data.address 
     }]);
     if (error) setErrorMessage(error.message);
-    else fetchInitialData(user.id);
+    else {
+        setShowCreateCompany(false);
+        fetchInitialData(user.id);
+    }
   };
 
   const createIssuance = async (data) => {
@@ -318,8 +319,38 @@ const EquityManagementApp = () => {
         payment_status: data.payment_status
     }]);
     if (error) setErrorMessage(error.message);
-    else fetchCompanyRelatedData(selectedCompany.id);
+    else {
+        setShowCreateIssuance(false);
+        fetchCompanyRelatedData(selectedCompany.id);
+    }
   };
+  
+  // --- FIX: Added Welcome Screen for new users with no companies ---
+  const renderMainContent = () => {
+    if (!selectedCompany && companies.length === 0) {
+        return (
+            <div className="text-center p-10 bg-white rounded-lg shadow-md">
+                <h2 className="text-2xl font-semibold mb-4" style={{color: theme.text}}>Welcome to Kapitalized Equity!</h2>
+                <p className="mb-6" style={{color: theme.lightText}}>It looks like you don't have any companies yet. Get started by creating your first one.</p>
+                <button
+                    onClick={() => setShowCreateCompany(true)}
+                    className="px-6 py-3 rounded-md hover:opacity-90 flex items-center mx-auto"
+                    style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
+                >
+                    <PlusCircle className="h-5 w-5 mr-2" />
+                    Create Your First Company
+                </button>
+            </div>
+        );
+    }
+    
+    // Original content rendering logic
+    return (
+        <>
+            {/* All the original tab content */}
+        </>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -351,6 +382,8 @@ const EquityManagementApp = () => {
         <div className="flex-1 overflow-y-auto p-6">
           {successMessage && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">{successMessage}</div>}
           {errorMessage && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">{errorMessage}</div>}
+          
+          {renderMainContent()}
           
           {activeTab === 'payments' && (
             <PaymentsPage userProfile={userProfile} />
