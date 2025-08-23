@@ -12,7 +12,8 @@
     "web-vitals": "^2.1.4",
     "lucide-react": "^0.263.1",
     "recharts": "^2.8.0",
-    "lodash": "^4.17.21"
+    "lodash": "^4.17.21",
+    "@supabase/supabase-js": "^2.44.2"
   },
   "scripts": {
     "start": "react-scripts start",
