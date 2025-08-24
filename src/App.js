@@ -1123,6 +1123,33 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
 };
 
 
+// AdminConfirmModal Component
+const AdminConfirmModal = ({ message, onConfirm, onCancel }) => (
+  <Modal onClose={onCancel}>
+    <div className="p-4">
+      <h3 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Confirm Action</h3>
+      <p className="text-sm" style={{ color: theme.lightText }}>{message}</p>
+      <div className="flex justify-end space-x-2 mt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  </Modal>
+);
+
+
 // AdminApp Component
 const AdminApp = () => {
   const [loadingAdminData, setLoadingAdminData] = useState(true);
@@ -1135,6 +1162,11 @@ const AdminApp = () => {
   const [adminCompanySearchTerm, setAdminCompanySearchTerm] = useState('');
   const [adminSelectedCompany, setAdminSelectedCompany] = useState(null);
   const [adminUser, setAdminUser] = useState(null); // Admin user state
+
+  // State for custom confirmation modal
+  const [showAdminConfirmModal, setShowAdminConfirmModal] = useState(false);
+  const [adminConfirmModalDetails, setAdminConfirmModalDetails] = useState({ id: null, type: '', message: '' });
+
 
   const addError = (message) => {
     // For admin interface, we might display errors differently or log them
@@ -1195,26 +1227,29 @@ const AdminApp = () => {
   const fetchAllAdminData = async () => {
     setLoadingAdminData(true);
     try {
-      const [usersResponse, companiesResponse, issuancesResponse] = await Promise.all([
-        fetch(`${ADMIN_BACKEND_BASE_URL}/users`),
-        fetch(`${ADMIN_BACKEND_BASE_URL}/companies`),
-        fetch(`${ADMIN_BACKEND_BASE_URL}/issuances`)
-      ]);
-
+      console.log("Admin: Fetching users data...");
+      const usersResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/users`);
       if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
       const usersData = await usersResponse.json();
+      console.log("Admin: Fetched users data:", usersData);
       setAllUsers(usersData);
 
+      console.log("Admin: Fetching companies data...");
+      const companiesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/companies`);
       if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
       const companiesData = await companiesResponse.json();
+      console.log("Admin: Fetched companies data:", companiesData);
       setAllCompanies(companiesData);
 
+      console.log("Admin: Fetching issuances data...");
+      const issuancesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/issuances`);
       if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
       const issuancesData = await issuancesResponse.json();
+      console.log("Admin: Fetched issuances data:", issuancesData);
       setAllIssuances(issuancesData);
 
     } catch (error) {
-      console.error("Error fetching admin data:", error);
+      console.error("Admin: Error fetching admin data:", error);
       addError('Failed to fetch admin data: ' + error.message);
     } finally {
       setLoadingAdminData(false);
@@ -1222,13 +1257,17 @@ const AdminApp = () => {
   };
 
   const handleAdminDelete = async (id, type) => {
-    // Replaced window.confirm with custom alert/modal for user experience.
-    // For now, using a simple console log placeholder to illustrate the change.
-    console.log(`Confirming deletion of ${type} with ID: ${id}`);
-    // In a real app, this would be a modal confirmation, for now, we assume confirmed for admin.
-    const confirmed = window.confirm(`Are you sure you want to delete this ${type}? This cannot be undone.`);
+    setAdminConfirmModalDetails({
+      id,
+      type,
+      message: `Are you sure you want to delete this ${type} (ID: ${id})? This action cannot be undone and may delete associated data.`
+    });
+    setShowAdminConfirmModal(true);
+  };
 
-    if (!confirmed) return; // If user cancels the confirmation
+  const confirmAdminDelete = async () => {
+    const { id, type } = adminConfirmModalDetails;
+    setShowAdminConfirmModal(false); // Close modal immediately
 
     setLoadingAdminData(true);
     try {
@@ -1242,7 +1281,7 @@ const AdminApp = () => {
         const errorData = await response.json();
         throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorData.detail || errorData.error}`);
       }
-      addError(`${type} deleted successfully!`);
+      addError(`${type} with ID ${id} deleted successfully!`);
       fetchAllAdminData(); // Refresh data after deletion
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
@@ -1291,6 +1330,7 @@ const AdminApp = () => {
     : allIssuances;
 
   // Filter users by selected company's owner, or show all users if no company is selected
+  // Corrected logic: if a company is selected, show only its owner. Otherwise, show all users.
   const displayedUsers = adminSelectedCompany
     ? allUsers.filter(userItem => userItem.id === adminSelectedCompany.user_id)
     : allUsers;
@@ -1412,6 +1452,14 @@ const AdminApp = () => {
           )}
         </div>
       </div>
+      {showAdminConfirmModal && (
+        <AdminConfirmModal
+          key={adminConfirmModalDetails.id || 'admin-confirm-modal'} // Key to force re-render on details change
+          message={adminConfirmModalDetails.message}
+          onConfirm={confirmAdminDelete}
+          onCancel={() => setShowAdminConfirmModal(false)}
+        />
+      )}
     </div>
   );
 };
@@ -2793,7 +2841,7 @@ const EquityManagementApp = () => {
   const companiesTableColumns = [
     { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
     { key: 'description', header: 'Description', isSortable: true },
-    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || ''}, ${row.address.state}, ${row.address.country}` : 'N/A' },
+    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || '', row.address.state}, ${row.address.country}` : 'N/A' },
   ];
 
 
