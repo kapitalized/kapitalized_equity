@@ -58,7 +58,7 @@ const SHAREHOLDER_TYPES = [
 ];
 
 // --- Reusable SortableTable Component ---
-const SortableTable = ({ data, columns, onRowDelete, entityType, addError }) => {
+const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addError }) => {
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
   const [searchTerm, setSearchTerm] = useState('');
@@ -127,7 +127,7 @@ const SortableTable = ({ data, columns, onRowDelete, entityType, addError }) => 
                   </div>
                 </th>
               ))}
-              {onRowDelete && (
+              {(onRowDelete || onRowEdit) && (
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
               )}
             </tr>
@@ -140,9 +140,10 @@ const SortableTable = ({ data, columns, onRowDelete, entityType, addError }) => 
                     {column.render ? column.render(row) : row[column.key]}
                   </td>
                 ))}
-                {onRowDelete && (
+                {(onRowDelete || onRowEdit) && (
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button onClick={() => onRowDelete(row.id, entityType)} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-4 w-4" /></button>
+                    {onRowEdit && <button onClick={() => onRowEdit(row.id, entityType)} className="text-blue-600 hover:text-blue-900 mr-2"><Edit className="h-4 w-4" /></button>}
+                    {onRowDelete && <button onClick={() => onRowDelete(row.id, entityType)} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>}
                   </td>
                 )}
               </tr>
@@ -158,7 +159,7 @@ const SortableTable = ({ data, columns, onRowDelete, entityType, addError }) => 
                     {column.isSummable ? (column.key === 'totalValue' ? `$${totals[column.key].toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : totals[column.key].toLocaleString()) : ''}
                   </td>
                 ))}
-                {onRowDelete && <td className="px-6 py-3"></td>} {/* Empty cell for actions column */}
+                {(onRowDelete || onRowEdit) && <td className="px-6 py-3"></td>} {/* Empty cell for actions column */}
               </tr>
             </tfoot>
           )}
@@ -522,7 +523,8 @@ const EquityManagementApp = () => {
       } else if (data.user) {
         setSignUpSuccessMessage('Sign up successful! Please check your email to confirm your account. You can now log in.');
 
-        await createSampleDataForNewUser(data.user.id);
+        // Removed the call to createSampleDataForNewUser(data.user.id);
+        // await createSampleDataForNewUser(data.user.id);
 
         setShowSignUp(false);
         setShowLogin(true);
@@ -824,127 +826,8 @@ const EquityManagementApp = () => {
   };
 
 
-  const createSampleDataForNewUser = async (userId) => {
-    if (!supabase) {
-      console.error("Supabase client not initialized for sample data creation.");
-      return;
-    }
-    try {
-      const { data: sampleCompany, error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          name: 'Umbrella Corp Ltd [Sample]',
-          description: 'Sample company for demonstration purposes',
-          user_id: userId,
-        })
-        .select()
-        .single();
-
-      if (companyError) throw companyError;
-      console.log('Sample company created:', sampleCompany.name);
-
-      const defaultShareClasses = [
-        { name: 'Common', priority: 10, description: 'Standard common shares' },
-        { name: 'Preference Participating', priority: 1, description: 'Preferred shares with participation rights' },
-        { name: 'Preference Non-Participating', priority: 2, description: 'Preferred shares without participation rights' },
-        { name: 'Convertible', priority: 5, description: 'Shares convertible into common shares' },
-      ];
-
-      const shareClassesToInsert = defaultShareClasses.map(sc => ({
-        ...sc,
-        company_id: sampleCompany.id
-      }));
-
-      const { error: shareClassError } = await supabase
-        .from('share_classes')
-        .insert(shareClassesToInsert);
-
-      if (shareClassError) {
-        console.error("Error inserting default share classes:", shareClassError.message);
-        addError('Company created, but failed to add default share classes: ' + shareClassError.message);
-      } else {
-        fetchCompanyRelatedData(sampleCompany.id);
-      }
-
-      const sampleShareholdersData = [
-        { name: 'Alice Smith [Sample]', email: 'alice.sample@example.com', type: SHAREHOLDER_TYPES[0] }, // Using SHAREHOLDER_TYPES
-        { name: 'Bob Johnson [Sample]', email: 'bob.sample@example.com', type: SHAREHOLDER_TYPES[2] }, // Using SHAREHOLDER_TYPES
-        { name: 'Charlie Brown [Sample]', email: 'charlie.sample@example.com', type: SHAREHOLDER_TYPES[4] }, // Using SHAREHOLDER_TYPES
-      ];
-
-      const shareholdersToInsert = sampleShareholdersData.map(sh => ({
-        ...sh,
-        company_id: sampleCompany.id,
-      }));
-
-      const { data: createdShareholders, error: shareholdersError } = await supabase
-        .from('shareholders')
-        .insert(shareholdersToInsert)
-        .select();
-
-      if (shareholdersError) throw shareholdersError;
-      console.log('Sample shareholders created:', createdShareholders.map(s => s.name));
-
-      const { data: fetchedShareClasses } = await supabase
-        .from('share_classes')
-        .select('*')
-        .eq('company_id', sampleCompany.id);
-
-      const commonClass = fetchedShareClasses.find(sc => sc.name === 'Common');
-      const prefPartClass = fetchedShareClasses.find(sc => sc.name === 'Preference Participating');
-
-      if (!commonClass || !prefPartClass) {
-        console.warn('Could not find default share classes for sample issuances.');
-        return;
-      }
-
-      const sampleIssuancesData = [
-        {
-          shareholder_id: createdShareholders[0].id,
-          share_class_id: commonClass.id,
-          shares: 1000000,
-          price_per_share: 0.01,
-          issue_date: '2023-01-01',
-          round: 1, // Changed to integer
-          round_description: 'Seed Round', // New field
-        },
-        {
-          shareholder_id: createdShareholders[1].id,
-          share_class_id: prefPartClass.id,
-          shares: 500000,
-          price_per_share: 1.50,
-          issue_date: '2023-06-15',
-          round: 2, // Changed to integer
-          round_description: 'Series A', // New field
-        },
-        {
-          shareholder_id: createdShareholders[2].id,
-          share_class_id: commonClass.id,
-          shares: 50000,
-          price_per_share: 0.01,
-          issue_date: '2023-02-01',
-          round: 1, // Changed to integer
-          round_description: 'Seed Round', // New field
-        },
-      ];
-
-      const issuancesToInsert = sampleIssuancesData.map(issuance => ({
-        ...issuance,
-        company_id: sampleCompany.id,
-      }));
-
-      const { error: issuancesError } = await supabase
-        .from('share_issuances')
-        .insert(issuancesToInsert);
-
-      if (issuancesError) throw issuancesError;
-      console.log('Sample issuances created.');
-
-    } catch (error) {
-      console.error('Error creating sample data for new user:', error.message);
-      addError('Failed to create sample data: ' + error.message);
-    }
-  };
+  // Removed createSampleDataForNewUser function as per request.
+  // const createSampleDataForNewUser = async (userId) => { /* ... */ };
 
 
   const createCompany = async (data) => {
@@ -1032,6 +915,16 @@ const EquityManagementApp = () => {
       setLoading(false);
     }
   };
+
+  const handleEditShareholder = (shareholderId) => {
+    // Placeholder for edit logic
+    addError(`Edit shareholder with ID: ${shareholderId}`);
+    // In a real application, you would typically:
+    // 1. Fetch the shareholder data by ID
+    // 2. Populate an edit form with the data
+    // 3. Show the edit form (e.g., in a modal)
+  };
+
 
   const createShareClass = async (data) => {
     if (!selectedCompany) return;
@@ -1567,14 +1460,7 @@ const EquityManagementApp = () => {
     { key: 'type', header: 'Type', isSortable: true },
     { key: 'totalShares', header: 'Total Shares', isSortable: true, isSummable: true, render: (row) => row.totalShares.toLocaleString() },
     { key: 'totalValue', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
-    { key: 'holdings', header: 'Holdings Details', isSortable: false, render: (row) => (
-        row.holdings.map((holding, idx) => (
-            <div key={idx} className="mb-1">
-                {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round} - {holding.roundTitle || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-            </div>
-        ))
-      )
-    },
+    // Removed 'Holdings Details' column
   ];
 
   // Columns for Issuances table
@@ -1819,6 +1705,9 @@ const EquityManagementApp = () => {
                 {activeTab === 'account' && (
                   <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>My Account</h1>
                 )}
+                {activeTab === 'subscriptionPage' && (
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>My Subscription</h1>
+                )}
               </div>
 
               {/* Active Company Name and User Account Dropdown */}
@@ -1847,6 +1736,12 @@ const EquityManagementApp = () => {
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                       >
                         Login Details
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('subscriptionPage'); setShowLoginDetailsDropdown(false); }} // New Subscription menu item
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                      >
+                        Subscription
                       </button>
                       <button
                         onClick={handleLogout}
@@ -2040,6 +1935,7 @@ const EquityManagementApp = () => {
                     columns={shareholderTableColumns}
                     entityType="shareholder"
                     addError={addError}
+                    onRowEdit={handleEditShareholder} // Pass the edit handler
                     onRowDelete={() => { /* Implement if needed */ }}
                   />
                 </div>
@@ -2409,6 +2305,9 @@ const EquityManagementApp = () => {
 
               {activeTab === 'admin' && userProfile?.is_admin && (
                 <AdminDashboard addError={addError} />
+              )}
+              {activeTab === 'subscriptionPage' && (
+                <SubscriptionPage userProfile={userProfile} handleCheckout={handleCheckout} loading={loading} addError={addError} />
               )}
             </>
           )}
@@ -3269,32 +3168,40 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
 };
 
 // SubscriptionPage Component
-const SubscriptionPage = ({ user, handleCheckout, loading, addError }) => {
+const SubscriptionPage = ({ userProfile, handleCheckout, loading }) => {
+  const isPremiumUser = userProfile?.subscription_status === 'active';
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
-        <CreditCard className="mx-auto h-16 w-16 text-blue-600 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Unlock Premium Features</h2>
-        <p className="text-gray-700 mb-6">
-          Upgrade to our Premium Plan to access all advanced reports, scenario planning, and unlimited company management.
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Subscription Status</h2>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Your Current Plan</h3>
+        <p className="text-2xl font-bold" style={{color: isPremiumUser ? theme.secondary : theme.primary}}>
+            {isPremiumUser ? 'Premium Plan' : 'Free Plan'}
         </p>
-        {addError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <span className="block sm:inline">{addError}</span>
-          </div>
-        )}
-        <button
-          onClick={handleCheckout}
-          className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center text-lg font-semibold"
-          disabled={loading}
-        >
-          {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
-          Subscribe Now
-        </button>
-        <p className="text-sm text-gray-500 mt-4">
-          You will be redirected to your WooCommerce site to complete the subscription.
+        <p className="text-sm text-gray-600 mt-2">
+            {isPremiumUser ? 'You have access to all premium features.' : 'Your current access is limited to basic features.'}
         </p>
       </div>
+      {!isPremiumUser && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-bold text-gray-900 mb-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Upgrade to Premium</h3>
+          <p className="text-sm text-gray-600 mb-4">
+              Unlock advanced reports, scenario planning, and unlimited company management.
+          </p>
+          <button
+            onClick={handleCheckout}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center text-lg font-semibold"
+            disabled={loading}
+          >
+            {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+            Upgrade Now
+          </button>
+          <p className="text-sm text-gray-500 mt-4">
+            You will be redirected to your WooCommerce site to complete the subscription.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
