@@ -1091,6 +1091,20 @@ const AdminApp = () => {
 
   useEffect(() => {
     // Check admin authentication on mount
+    const initAdminAuth = async () => {
+      if (typeof window.supabase === 'undefined') {
+        // Supabase not yet loaded, wait for it
+        const interval = setInterval(() => {
+          if (typeof window.supabase !== 'undefined') {
+            clearInterval(interval);
+            checkAdminAuth();
+          }
+        }, 100); // Poll every 100ms
+        return;
+      }
+      checkAdminAuth();
+    };
+
     const checkAdminAuth = async () => {
       if (!window.supabase) {
         addError("Supabase client not initialized.");
@@ -1117,7 +1131,8 @@ const AdminApp = () => {
       setAdminUser(session.user);
       fetchAllAdminData();
     };
-    checkAdminAuth();
+
+    initAdminAuth();
   }, []);
 
 
@@ -1232,10 +1247,10 @@ const AdminApp = () => {
           <button onClick={() => setCurrentView('companies')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'companies' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Building2 className="h-5 w-5 mr-3" /> All Companies
           </button>
-          <button onClick={() => setCurrentView('issuances')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'issuances' ? 'bg-blue-100 text-blue-700' : 'bg-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+          <button onClick={() => setCurrentView('issuances')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'issuances' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <PlusCircle className="h-5 w-5 mr-3" /> All Issuances
           </button>
-          <button onClick={() => setCurrentView('users')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'users' ? 'bg-blue-100 text-blue-700' : 'bg-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+          <button onClick={() => setCurrentView('users')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'users' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Users className="h-5 w-5 mr-3" /> All Users
           </button>
           <button onClick={async () => { await window.supabase.auth.signOut(); window.location.href = '/adminhq/login'; }} className="w-full flex items-center p-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 mt-4">
@@ -1439,7 +1454,12 @@ const EquityManagementApp = () => {
     );
 
     // Initial check for session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+        if (error) {
+            addError("Error checking initial session: " + error.message);
+            setLoading(false);
+            return;
+        }
         const currentUser = session?.user || null;
         setUser(currentUser);
         if (currentUser) {
@@ -3335,8 +3355,8 @@ const EquityManagementApp = () => {
                       {selectedRound !== 'current' && selectedRound !== '' && (
                         <div className="mt-4">
                           <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Status at Round {displayEquityDataInclOptions.companyData.classSummary[0]?.round} ({displayEquityDataInclOptions.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
-                          <p style={{ color: theme.lightText }}>Total Shares: {displayEquityDataInclOptions.companyData.totalShares.toLocaleString()}</p>
-                          <p style={{ color: theme.lightText }}>Total Value: ${displayEquityDataInclOptions.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                          <p style={{ color: theme.lightText }}>Total Shares: {companyDataInclOptions.totalShares.toLocaleString()}</p>
+                          <p style={{ color: theme.lightText }}>Total Value: ${companyDataInclOptions.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                           <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Holdings at Round {displayEquityDataInclOptions.companyData.classSummary[0]?.round} ({displayEquityDataInclOptions.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
                           <SortableTable
                             data={displayEquityDataInclOptions.shareholderData}
