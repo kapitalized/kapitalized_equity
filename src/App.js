@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
-// import { createClient } from '@supabase/supabase-js'; // Removed direct import to fix build error
+// import { createClient } from '@supabase/supabase-js'; // Removed direct import
 
-// Date stamp for the last update to this file: 202508242130
+// Date stamp for the last update to this file: 202508241730
 // IMPORTANT: URL for the main equity calculation FastAPI endpoint
 const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
 // IMPORTANT: Base URL for admin operations on FastAPI
@@ -29,36 +29,7 @@ const theme = {
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
 
-
-// --- React Context for Supabase ---
-const SupabaseContext = createContext(null);
-
-const SupabaseProvider = ({ children }) => {
-  const [supabaseClient, setSupabaseClient] = useState(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !supabaseClient) {
-      try {
-        // Ensure window.supabase is available before trying to create a client
-        if (window.supabase && typeof window.supabase.createClient === 'function') {
-          const client = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-          setSupabaseClient(client);
-          console.log("Supabase client initialized via Provider.");
-        } else {
-          console.warn("window.supabase.createClient is not available yet.");
-        }
-      } catch (e) {
-        console.error("Failed to initialize Supabase client:", e.message);
-      }
-    }
-  }, [supabaseClient]);
-
-  return (
-    <SupabaseContext.Provider value={supabaseClient}>
-      {children}
-    </SupabaseContext.Provider>
-  );
-};
+let supabase = null; // Initialize as null, will be set in useEffect
 
 // --- Data for Address Dropdowns ---
 const countryData = {
@@ -89,6 +60,902 @@ const SHAREHOLDER_TYPES = [
 
 // Share types to exclude from 'ex-Options' calculations
 const EXCLUDED_SHARE_TYPES = ['Convertible', 'Options'];
+
+// --- Reusable Components (Defined at top level for global access) ---
+
+// Modal Component
+const Modal = ({ children, onClose }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto relative">
+      <button
+        onClick={onClose}
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      {children}
+    </div>
+  </div>
+);
+
+// AddressForm Component
+const AddressForm = ({ initialAddress, onAddressChange }) => {
+  const [address, setAddress] = useState(initialAddress || { line1: '', line2: '', country: '', state: '', postcode: '' });
+  const [states, setStates] = useState([]);
+
+  useEffect(() => {
+    if (address.country) {
+      setStates(countryData[address.country] || []);
+    } else {
+      setStates([]);
+    }
+  }, [address.country]);
+
+  const handleChange = (field, value) => {
+    const newAddress = { ...address, [field]: value };
+    if (field === 'country') {
+      newAddress.state = '';
+    }
+    setAddress(newAddress);
+    onAddressChange(newAddress);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Street number and name</label>
+        <input type="text" value={address.line1} onChange={(e) => handleChange('line1', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Line 2 (optional)</label>
+        <input type="text" value={address.line2} onChange={(e) => handleChange('line2', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+        <select value={address.country} onChange={(e) => handleChange('country', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+          <option value="">Select Country</option>
+          {Object.keys(countryData).map(country => <option key={country} value={country}>{country}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">State or Province</label>
+        <select value={address.state} onChange={(e) => handleChange('state', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required disabled={!states.length}>
+          <option value="">Select State/Province</option>
+          {states.map(state => <option key={state} value={state}>{state}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Postcode or Zip</label>
+        <input type="text" value={address.postcode} onChange={(e) => handleChange('postcode', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+      </div>
+    </div>
+  );
+};
+
+// CompanyForm Component
+const CompanyForm = ({ onSubmit, onCancel, initialData = {} }) => {
+  const [data, setData] = useState({
+    name: initialData.name || '',
+    description: initialData.description || '',
+    address: initialData.address || { line1: '', line2: '', country: '', state: '', postcode: '' }
+  });
+
+  const handleAddressChange = (address) => {
+      setData(prev => ({ ...prev, address }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(data);
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>{initialData.id ? 'Edit Company' : 'Create New Company'}</h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+          <input
+            type="text"
+            value={data.name}
+            onChange={(e) => setData({...data, name: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea
+            value={data.description}
+            onChange={(e) => setData({...data, description: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows="3"
+          />
+        </div>
+        <AddressForm initialAddress={data.address} onAddressChange={handleAddressChange} />
+      </div>
+      <div className="flex justify-end space-x-2 mt-6">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          {initialData.id ? 'Update Company' : 'Create Company'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ShareholderForm Component
+const ShareholderForm = ({ onSubmit, onCancel, initialData = {} }) => {
+  const [data, setData] = useState({
+    name: initialData.name || '',
+    email: initialData.email || '',
+    type: initialData.type || SHAREHOLDER_TYPES[0]
+  }); // Default to first SHAREHOLDER_TYPE
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(data);
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>{initialData.id ? 'Edit Shareholder' : 'Add New Shareholder'}</h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+          <input
+            type="text"
+            value={data.name}
+            onChange={(e) => setData({...data, name: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={data.email}
+            onChange={(e) => setData({...data, email: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+          <select
+            value={data.type}
+            onChange={(e) => setData({...data, type: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            {SHAREHOLDER_TYPES.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex justify-end space-x-2 mt-6">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          {initialData.id ? 'Update Shareholder' : 'Add Shareholder'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// ShareClassForm Component
+const ShareClassForm = ({ onSubmit, onCancel }) => {
+  const [data, setData] = useState({ name: '', priority: 1, description: '' });
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({...data, priority: parseInt(data.priority)});
+  };
+  return (
+    <form onSubmit={handleSubmit}>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Create Share Class</h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Class Name</label>
+          <input
+            type="text"
+            value={data.name}
+            onChange={(e) => setData({...data, name: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., Common, Preferred A"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Priority (1 = highest)</label>
+          <input
+            type="number"
+            value={data.priority}
+            onChange={(e) => setData({...data, priority: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min="1"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <textarea
+            value={data.description}
+            onChange={(e) => setData({...data, description: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows="2"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end space-x-2 mt-6">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+        >
+          Create Class
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// IssuanceForm Component
+const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialData = {} }) => {
+  const [data, setData] = useState({
+    roundNumber: initialData.round || '', // Use round for roundNumber
+    roundTitle: initialData.round_description || '', // Use round_description for roundTitle
+    shareholderId: initialData.shareholder_id || '',
+    shareClassId: initialData.share_class_id || '',
+    shares: initialData.shares || '',
+    pricePerShare: initialData.price_per_share || '',
+    issueDate: new Date().toISOString().split('T')[0],
+    payment_status: initialData.payment_status || 'No',
+  });
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(data);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Record Share Issuance</h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Round Number</label>
+          <input
+            type="number"
+            value={data.roundNumber}
+            onChange={(e) => setData({...data, roundNumber: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min="1"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Round Title (e.g., Seed, Series A)</label>
+          <input
+            type="text"
+            value={data.roundTitle}
+            onChange={(e) => setData({...data, roundTitle: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            maxLength="30"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder</label>
+          <select
+            value={data.shareholderId}
+            onChange={(e) => setData({...data, shareholderId: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            <option value="">Select Shareholder</option>
+            {shareholders.map(shareholder => (
+              <option key={shareholder.id} value={shareholder.id}>{shareholder.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Share Class</label>
+          <select
+            value={data.shareClassId}
+            onChange={(e) => setData({...data, shareClassId: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            <option value="">Select Share Class</option>
+            {shareClasses.map(shareClass => (
+              <option key={shareClass.id} value={shareClass.id}>{shareClass.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Number of Shares</label>
+          <input
+            type="number"
+            value={data.shares}
+            onChange={(e) => setData({...data, shares: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min="1"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Price per Share ($)</label>
+          <input
+            type="number"
+            step="0.01"
+            value={data.pricePerShare}
+            onChange={(e) => setData({...data, pricePerShare: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min="0"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+          <input
+            type="date"
+            value={data.issueDate}
+            onChange={(e) => setData({...data, issueDate: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Shares have been paid for?</label>
+            <select value={data.payment_status} onChange={(e) => setData({...data, payment_status: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                <option>Yes</option>
+                <option>Partial</option>
+                <option>No</option>
+            </select>
+        </div>
+      </div>
+      <div className="flex justify-end space-x-2 mt-6">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          Record Issuance
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// New Component: BulkIssuanceForm
+const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) => {
+  const [issuances, setIssuances] = useState([
+    { roundNumber: '', roundTitle: '', shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], payment_status: 'No' }
+  ]);
+
+  const addRow = () => {
+    setIssuances([...issuances, { roundNumber: '', roundTitle: '', shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], payment_status: 'No' }]);
+  };
+
+  const removeRow = (index) => {
+    const newIssuances = issuances.filter((_, i) => i !== index);
+    setIssuances(newIssuances);
+  };
+
+  const handleChange = (index, field, value) => {
+    const newIssuances = [...issuances];
+    newIssuances[index][field] = value;
+    setIssuances(newIssuances);
+  };
+
+  const handleSubmitAll = async (e) => {
+    e.preventDefault();
+    let allSuccessful = true;
+    for (const issuance of issuances) {
+      if (!issuance.shareholderId || !issuance.shareClassId || !issuance.shares || !issuance.pricePerShare || !issuance.issueDate || !issuance.roundNumber) {
+        addError('Please fill all required fields for all issuances.');
+        allSuccessful = false;
+        break;
+      }
+      try {
+        await onSubmit(issuance);
+      } catch (error) {
+        addError(`Error adding one or more issuances: ${error.message}`);
+        allSuccessful = false;
+        break;
+      }
+    }
+    if (allSuccessful) {
+      addError('All issuances added successfully!');
+      setIssuances([{ roundNumber: '', roundTitle: '', shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], payment_status: 'No' }]);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmitAll}>
+      {issuances.map((issuance, index) => (
+        <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md relative">
+          <h4 className="text-md font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Issuance #{index + 1}</h4>
+          {issuances.length > 1 && (
+            <button
+              type="button"
+              onClick={() => removeRow(index)}
+              className="absolute top-3 right-3 text-red-500 hover:text-red-700"
+              title="Remove this row"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Round Number</label>
+              <input
+                type="number"
+                value={issuance.roundNumber}
+                onChange={(e) => handleChange(index, 'roundNumber', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="1"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Round Title (e.g., Seed, Series A)</label>
+              <input
+                type="text"
+                value={issuance.roundTitle}
+                onChange={(e) => handleChange(index, 'roundTitle', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                maxLength="30"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder</label>
+              <select
+                value={issuance.shareholderId}
+                onChange={(e) => handleChange(index, 'shareholderId', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select Shareholder</option>
+                {shareholders.map(shareholder => (
+                  <option key={shareholder.id} value={shareholder.id}>{shareholder.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Share Class</label>
+              <select
+                value={issuance.shareClassId}
+                onChange={(e) => handleChange(index, 'shareClassId', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select Share Class</option>
+                {shareClasses.map(shareClass => (
+                  <option key={shareClass.id} value={shareClass.id}>{shareClass.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Shares</label>
+              <input
+                type="number"
+                value={issuance.shares}
+                onChange={(e) => handleChange(index, 'shares', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="1"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Price per Share ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={issuance.pricePerShare}
+                onChange={(e) => handleChange(index, 'pricePerShare', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="0"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+              <input
+                type="date"
+                value={issuance.issueDate}
+                onChange={(e) => handleChange(index, 'issueDate', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Shares have been paid for?</label>
+                <select value={issuance.payment_status} onChange={(e) => handleChange(index, 'payment_status', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                    <option>Yes</option>
+                    <option>Partial</option>
+                    <option>No</option>
+                </select>
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="flex justify-end space-x-2 mt-6">
+        <button
+          type="button"
+          onClick={addRow}
+          className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 flex items-center"
+        >
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Add Row
+        </button>
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          Add All Issuances
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// New Component: BulkShareholderForm
+const BulkShareholderForm = ({ onSubmit, addError }) => {
+  const [shareholders, setShareholders] = useState(
+    Array.from({ length: 5 }, () => ({ name: '', email: '', type: SHAREHOLDER_TYPES[0] })) // Default to first SHAREHOLDER_TYPE
+  );
+
+  const handleChange = (index, field, value) => {
+    const newShareholders = [...shareholders];
+    newShareholders[index][field] = value;
+    setShareholders(newShareholders);
+  };
+
+  const handleSubmitAll = async (e) => {
+    e.preventDefault();
+    let allSuccessful = true;
+    for (const shareholder of shareholders) {
+      if (shareholder.name.trim() !== '') {
+        try {
+          await onSubmit(shareholder);
+        } catch (error) {
+          addError(`Error adding shareholder ${shareholder.name}: ${error.message}`);
+          allSuccessful = false;
+          break;
+        }
+      }
+    }
+    if (allSuccessful) {
+      addError('All valid shareholders added successfully!');
+      setShareholders(Array.from({ length: 5 }, () => ({ name: '', email: '', type: SHAREHOLDER_TYPES[0] })));
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmitAll}>
+      {shareholders.map((shareholder, index) => (
+        <div key={index} className="mb-4 p-4 border border-gray-200 rounded-md">
+          <h4 className="text-md font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder #{index + 1}</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                value={shareholder.name}
+                onChange={(e) => handleChange(index, 'name', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required={index === 0}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                value={shareholder.email}
+                onChange={(e) => handleChange(index, 'email', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <select
+                value={shareholder.type}
+                onChange={(e) => handleChange(index, 'type', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                {SHAREHOLDER_TYPES.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      ))}
+      <div className="flex justify-end mt-6">
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          Add All Shareholders
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// UserProfileForm - for Name, Username, DOB, Address
+const UserProfileForm = ({ userProfile, onSubmit, addError }) => {
+  const [profileData, setProfileData] = useState({
+    fullName: userProfile?.full_name || '',
+    username: userProfile?.username || '',
+    dob: userProfile?.dob || '',
+    address: userProfile?.address || '',
+  });
+
+  useEffect(() => {
+    setProfileData({
+      fullName: userProfile?.full_name || '',
+      username: userProfile?.username || '',
+      dob: userProfile?.dob || '',
+      address: userProfile?.address || '',
+    });
+  }, [userProfile]);
+
+  const handleProfileSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({
+      fullName: profileData.fullName,
+      username: profileData.username,
+      dob: profileData.dob,
+      address: profileData.address,
+    });
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow">
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Profile Details</h3>
+      <form onSubmit={handleProfileSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+          <input
+            type="text"
+            value={profileData.fullName}
+            onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <input
+            type="text"
+            value={profileData.username}
+            onChange={(e) => setProfileData({...profileData, username: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Unique username"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+          <input
+            type="date"
+            value={profileData.dob}
+            onChange={(e) => setProfileData({...profileData, dob: e.target.value})}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <AddressForm initialAddress={profileData.address} onAddressChange={(newAddress) => setProfileData(prev => ({ ...prev, address: newAddress }))} />
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            type="submit"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          >
+            Update Profile
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// LoginDetailsForm - for Email and Password
+const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, onDeleteAccount, addError }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      addError('New password and confirmation do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      addError('Password must be at least 6 characters long.');
+      return;
+    }
+    onPasswordChange(newPassword);
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Login Information</h3>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email (Cannot be changed directly)</label>
+          <input
+            type="email"
+            value={userEmail || ''}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+            readOnly
+          />
+        </div>
+        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+            >
+              Change Password
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Account Actions</h3>
+        <p className="text-sm" style={{ color: theme.lightText }}>
+          Deactivate your account to free up your email for new sign-ups, or permanently delete your account and all associated company data.
+        </p>
+        <div className="flex space-x-4">
+          <button
+            onClick={onDeactivateAccount}
+            className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 flex items-center"
+          >
+            <User className="h-4 w-4 mr-2" />
+            Deactivate Account
+          </button>
+          <button
+            onClick={onDeleteAccount}
+            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete My Account
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          *Note: Deactivating changes your email and status. Deleting removes your data. The core authentication record in Supabase `auth.users` cannot be deleted directly from the client-side for security reasons.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// SubscriptionPage Component
+const SubscriptionPage = ({ userProfile, handleCheckout, loading, addError }) => {
+  const isPremiumUser = userProfile?.subscription_status === 'active';
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Subscription Status</h2>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Your Current Plan</h3>
+        <p className="text-2xl font-bold" style={{color: isPremiumUser ? theme.secondary : theme.primary}}>
+            {isPremiumUser ? 'Premium Plan' : 'Free Plan'}
+        </p>
+        <p className="text-sm" style={{ color: theme.lightText }}>
+            {isPremiumUser ? 'You have access to all premium features.' : 'Your current access is limited to basic features.'}
+        </p>
+      </div>
+      {!isPremiumUser && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-bold text-gray-900 mb-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Upgrade to Premium</h3>
+          <p className="text-sm" style={{ color: theme.lightText }}>
+              Unlock advanced reports, scenario planning, and unlimited company management.
+          </p>
+          <button
+            onClick={handleCheckout}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center text-lg font-semibold"
+            disabled={loading}
+          >
+            {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+            Upgrade Now
+          </button>
+          <p className="text-sm" style={{ color: theme.lightText }}>
+            You will be redirected to your WooCommerce site to complete the subscription.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// New CompaniesPage Component
+const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError, setShowCreateCompany }) => {
+  // Columns for Companies table (new)
+  const companiesTableColumns = [
+    { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
+    { key: 'description', header: 'Description', isSortable: true },
+    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || ''}, ${row.address.state}, ${row.address.country}` : 'N/A' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Your Companies</h2>
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowCreateCompany(true)} // Connect to the state setter
+          className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+          style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
+        >
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Create New Company
+        </button>
+      </div>
+      <SortableTable
+        data={companies}
+        columns={companiesTableColumns}
+        entityType="company"
+        onRowEdit={onEditCompany}
+        onRowDelete={onDeleteCompany}
+        addError={addError}
+      />
+    </div>
+  );
+};
+
 
 // --- Reusable SortableTable Component ---
 const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addError }) => {
@@ -169,12 +1036,12 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
             {sortedData.map((row, rowIndex) => (
               <tr key={row.id || rowIndex}>
                 {columns.map(column => (
-                  <td key={column.key} className="px-6 py-4 whitespace-nowrap text-xs" style={{ color: theme.lightText }}> {/* Changed to text-xs */}
+                  <td key={column.key} className="px-6 py-4 whitespace-nowrap text-xs" style={{ color: theme.lightText }}>
                     {column.render ? column.render(row) : row[column.key]}
                   </td>
                 ))}
                 {(onRowDelete || onRowEdit) && (
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium"> {/* Changed to text-xs */}
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium">
                     {onRowEdit && <button onClick={() => onRowEdit(row.id, entityType)} className="text-blue-600 hover:text-blue-900 mr-2"><Edit className="h-4 w-4" /></button>}
                     {onRowDelete && <button onClick={() => onRowDelete(row.id, entityType)} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>}
                   </td>
@@ -187,12 +1054,12 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
             <tfoot className="bg-gray-50 font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>
               <tr>
                 <td className="px-6 py-3 text-left text-sm" style={{ color: theme.text }}>Total ({filteredData.length} {entityType}s)</td>
-                {columns.slice(1).map(column => ( // Skip first column for total label
+                {columns.slice(1).map(column => (
                   <td key={`total-${column.key}`} className="px-6 py-3 text-left text-sm" style={{ color: theme.text }}>
                     {column.isSummable ? (column.key === 'total_value' ? `$${totals[column.key].toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : totals[column.key].toLocaleString()) : ''}
                   </td>
                 ))}
-                {(onRowDelete || onRowEdit) && <td className="px-6 py-3"></td>} {/* Empty cell for actions column */}
+                {(onRowDelete || onRowEdit) && <td className="px-6 py-3"></td>}
               </tr>
             </tfoot>
           )}
@@ -201,11 +1068,10 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
     </div>
   );
 };
-// --- END Reusable SortableTable Component ---
 
 
-const AdminDashboard = ({ addError }) => {
-  const supabase = useContext(SupabaseContext);
+// AdminApp Component
+const AdminApp = () => {
   const [loadingAdminData, setLoadingAdminData] = useState(true);
   const [allUsers, setAllUsers] = useState([]);
   const [allCompanies, setAllCompanies] = useState([]);
@@ -217,27 +1083,48 @@ const AdminDashboard = ({ addError }) => {
   const [adminSelectedCompany, setAdminSelectedCompany] = useState(null);
   const [adminUser, setAdminUser] = useState(null); // Admin user state
 
+  const addError = (message) => {
+    // For admin interface, we might display errors differently or log them
+    console.error("Admin Error:", message);
+    // You could add a local state here to display admin-specific errors
+  };
+
   useEffect(() => {
-    const performAuthCheck = async () => {
-      if (!supabase) {
-        // Supabase is not ready yet, this useEffect will re-run when it is.
+    // Check admin authentication on mount
+    const initAdminAuth = async () => {
+      if (typeof window.supabase === 'undefined') {
+        // Supabase not yet loaded, wait for it
+        const interval = setInterval(() => {
+          if (typeof window.supabase !== 'undefined') {
+            clearInterval(interval);
+            checkAdminAuth();
+          }
+        }, 100); // Poll every 100ms
         return;
       }
-      const { data: { session }, error } = await supabase.auth.getSession();
+      checkAdminAuth();
+    };
+
+    const checkAdminAuth = async () => {
+      if (!window.supabase) {
+        addError("Supabase client not initialized.");
+        return;
+      }
+      const { data: { session }, error } = await window.supabase.auth.getSession();
 
       if (error || !session) {
         window.location.href = '/adminhq/login'; // Redirect to admin login if no session
         return;
       }
 
-      const { data: userProfile, error: profileError } = await supabase
+      const { data: userProfile, error: profileError } = await window.supabase
         .from('user_profiles')
         .select('is_admin')
         .eq('id', session.user.id)
         .single();
 
       if (profileError || !userProfile?.is_admin) {
-        await supabase.auth.signOut();
+        await window.supabase.auth.signOut();
         window.location.href = '/adminhq/login'; // Redirect if not admin
         return;
       }
@@ -245,8 +1132,8 @@ const AdminDashboard = ({ addError }) => {
       fetchAllAdminData();
     };
 
-    performAuthCheck();
-  }, [supabase]);
+    initAdminAuth();
+  }, []);
 
 
   const fetchAllAdminData = async () => {
@@ -360,13 +1247,13 @@ const AdminDashboard = ({ addError }) => {
           <button onClick={() => setCurrentView('companies')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'companies' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Building2 className="h-5 w-5 mr-3" /> All Companies
           </button>
-          <button onClick={() => setCurrentView('issuances')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'issuances' ? 'bg-blue-100 text-blue-700' : 'bg-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+          <button onClick={() => setCurrentView('issuances')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'issuances' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <PlusCircle className="h-5 w-5 mr-3" /> All Issuances
           </button>
           <button onClick={() => setCurrentView('users')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'users' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Users className="h-5 w-5 mr-3" /> All Users
           </button>
-          <button onClick={async () => { await supabase.auth.signOut(); window.location.href = '/adminhq/login'; }} className="w-full flex items-center p-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 mt-4">
+          <button onClick={async () => { await window.supabase.auth.signOut(); window.location.href = '/adminhq/login'; }} className="w-full flex items-center p-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 mt-4">
             <LogOut className="h-5 w-5 mr-3" /> Logout
           </button>
         </nav>
@@ -458,7 +1345,6 @@ const AdminDashboard = ({ addError }) => {
 
 
 const EquityManagementApp = () => {
-  const supabase = useContext(SupabaseContext); // Use context
   const dashboardRef = useRef();
   const pieChartRef = useRef();
 
@@ -528,7 +1414,22 @@ const EquityManagementApp = () => {
 
   // Supabase client initialization moved to useEffect
   useEffect(() => {
-    if (!supabase) return; // Wait for supabase to be initialized by the provider
+    if (typeof window !== 'undefined' && !supabase) { // Check if window is defined and supabase is not already initialized
+      try {
+        supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey); // Use window.supabase
+        console.log("Supabase client initialized.");
+      } catch (e) {
+        addError("Failed to initialize Supabase client: " + e.message);
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (!supabase) {
+      addError("Supabase client not initialized.");
+      setLoading(false);
+      return;
+    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -577,8 +1478,7 @@ const EquityManagementApp = () => {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [supabase]); // Depend on supabase from context
-
+  }, []);
 
   useEffect(() => {
     if (userProfile && userProfile.subscription_status === 'active') {
@@ -929,7 +1829,7 @@ const EquityManagementApp = () => {
             email: newEmail,
         });
 
-        if (authUpdateError) throw authUpdateError;
+        if (authUpdateData) throw authUpdateError;
         console.log('User email updated to inactive:', newEmail);
 
         const { error: profileUpdateError } = await supabase
@@ -1473,7 +2373,7 @@ const EquityManagementApp = () => {
               continue;
             }
 
-            let shareClass = shareClasses.find(sc => sc.name === shareClassName); // Corrected to use name
+            let shareClass = shareClasses.find(sc => sc.name === shareClassName);
             if (!shareClass) {
               console.warn(`Share class "${shareClassName}" not found. Skipping issuance.`);
               continue;
@@ -1481,7 +2381,7 @@ const EquityManagementApp = () => {
 
             const issuance = {
               shareholderId: shareholder.id,
-              shareClassId: shareClass.id, // Corrected to use ID
+              shareClassId: shareClass.id,
               shares: parseInt(shares),
               pricePerShare: parseFloat(pricePerShare),
               issueDate: issueDate || new Date().toISOString().split('T')[0],
@@ -2797,7 +3697,6 @@ const EquityManagementApp = () => {
 
 // Admin Login Component
 const AdminLogin = () => {
-  const supabase = useContext(SupabaseContext); // Use context
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -2806,13 +3705,13 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoginError('');
     setLoadingLogin(true);
-    if (!supabase) { // Use context supabase
+    if (!window.supabase) {
       setLoginError("Supabase client not initialized.");
       setLoadingLogin(false);
       return;
     }
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ // Use context supabase
+      const { data, error } = await window.supabase.auth.signInWithPassword({
         email: loginData.email,
         password: loginData.password,
       });
@@ -2820,14 +3719,14 @@ const AdminLogin = () => {
       if (error) throw error;
 
       // Check if the logged-in user is an admin
-      const { data: userProfile, error: profileError } = await supabase // Use context supabase
+      const { data: userProfile, error: profileError } = await window.supabase
         .from('user_profiles')
         .select('is_admin')
         .eq('id', data.user.id)
         .single();
 
       if (profileError || !userProfile?.is_admin) {
-        await supabase.auth.signOut(); // Use context supabase
+        await window.supabase.auth.signOut(); // Log out non-admin users
         setLoginError('You do not have admin privileges.');
         return;
       }
@@ -2902,6 +3801,7 @@ const App = () => {
   }, []);
 
   const getBuildNumber = () => {
+    // For demonstration, use a timestamp. In a real build, this would be injected by CI/CD.
     const date = new Date();
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -2914,19 +3814,19 @@ const App = () => {
   const buildNumber = getBuildNumber();
 
   if (currentRoute === '/adminhq') {
-    return <SupabaseProvider><AdminApp /></SupabaseProvider>;
+    return <AdminApp />;
   }
   if (currentRoute === '/adminhq/login') {
-    return <SupabaseProvider><AdminLogin /></SupabaseProvider>;
+    return <AdminLogin />;
   }
 
   return (
-    <SupabaseProvider>
+    <>
       <EquityManagementApp />
       <footer className="bg-gray-800 text-white text-center p-4 text-sm">
         <p>Last Build: {buildNumber}</p>
       </footer>
-    </SupabaseProvider>
+    </>
   );
 };
 
