@@ -348,7 +348,13 @@ const EquityManagementApp = () => {
   const [userProfile, setUserProfile] = useState(null);
 
   const [showCreateCompany, setShowCreateCompany] = useState(false);
+  const [showEditCompany, setShowEditCompany] = useState(false); // New state for editing company
+  const [editingCompanyData, setEditingCompanyData] = useState(null); // New state to hold company data being edited
+
   const [showCreateShareholder, setShowCreateShareholder] = useState(false);
+  const [showEditShareholder, setShowEditShareholder] = useState(false); // New state for editing shareholder
+  const [editingShareholderData, setEditingShareholderData] = useState(null); // New state to hold shareholder data being edited
+
   const [showCreateShareClass, setShowCreateShareClass] = useState(false);
   const [showCreateIssuance, setShowCreateIssuance] = useState(false);
   const [showBulkAddIssuance, setShowBulkAddIssuance] = useState(false);
@@ -885,6 +891,83 @@ const EquityManagementApp = () => {
     }
   };
 
+  const updateCompany = async (companyId, data) => {
+    if (!user || !selectedCompany) return;
+    setLoading(true);
+    setErrors([]);
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          name: data.name,
+          description: data.description,
+          address: data.address,
+        })
+        .eq('id', companyId)
+        .eq('user_id', user.id); // Ensure user owns the company
+
+      if (error) throw error;
+      setCompanies(companies.map(comp => comp.id === companyId ? { ...comp, ...data } : comp));
+      setSelectedCompany(prev => prev.id === companyId ? { ...prev, ...data } : prev);
+      setShowEditCompany(false);
+      setEditingCompanyData(null);
+      addError('Company updated successfully!');
+    } catch (error) {
+      addError('Error updating company: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCompany = async (companyId) => {
+    if (!user || !selectedCompany) return;
+    const confirmed = window.confirm("Are you sure you want to delete this company and all its associated data (shareholders, classes, issuances)? This cannot be undone.");
+    if (!confirmed) return;
+
+    setLoading(true);
+    setErrors([]);
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    try {
+      // Deletion is handled by the FastAPI backend's cascading delete logic
+      const response = await fetch(`${ADMIN_BACKEND_BASE_URL}/companies/${companyId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`HTTP error deleting company! status: ${response.status}, message: ${errorData.detail || errorData.error}`);
+      }
+
+      setCompanies(companies.filter(comp => comp.id !== companyId));
+      setSelectedCompany(null); // Clear selected company if deleted
+      fetchInitialData(user.id); // Re-fetch companies
+      addError('Company and all associated data deleted successfully!');
+    } catch (error) {
+      addError('Error deleting company: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCompany = (companyId) => {
+    const companyToEdit = companies.find(comp => comp.id === companyId);
+    if (companyToEdit) {
+      setEditingCompanyData(companyToEdit);
+      setShowEditCompany(true);
+    } else {
+      addError("Company not found for editing.");
+    }
+  };
+
+
   const createShareholder = async (data) => {
     if (!selectedCompany) return;
     setLoading(true);
@@ -909,6 +992,7 @@ const EquityManagementApp = () => {
       setShareholders(prevShareholders => [...prevShareholders, newShareholder]); // Correctly update state
       setShowCreateShareholder(false);
       setShowBulkAddShareholder(false);
+      addError('Shareholder added successfully!');
     } catch (error) {
       addError('Error creating shareholder: ' + error.message);
     } finally {
@@ -916,13 +1000,45 @@ const EquityManagementApp = () => {
     }
   };
 
+  const updateShareholder = async (shareholderId, data) => {
+    if (!user || !selectedCompany) return;
+    setLoading(true);
+    setErrors([]);
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('shareholders')
+        .update({
+          name: data.name,
+          email: data.email,
+          type: data.type,
+        })
+        .eq('id', shareholderId)
+        .eq('company_id', selectedCompany.id); // Ensure it belongs to selected company
+
+      if (error) throw error;
+      setShareholders(shareholders.map(sh => sh.id === shareholderId ? { ...sh, ...data } : sh));
+      setShowEditShareholder(false);
+      setEditingShareholderData(null);
+      addError('Shareholder updated successfully!');
+    } catch (error) {
+      addError('Error updating shareholder: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEditShareholder = (shareholderId) => {
-    // Placeholder for edit logic
-    addError(`Edit shareholder with ID: ${shareholderId}`);
-    // In a real application, you would typically:
-    // 1. Fetch the shareholder data by ID
-    // 2. Populate an edit form with the data
-    // 3. Show the edit form (e.g., in a modal)
+    const shareholderToEdit = shareholders.find(sh => sh.id === shareholderId);
+    if (shareholderToEdit) {
+      setEditingShareholderData(shareholderToEdit);
+      setShowEditShareholder(true);
+    } else {
+      addError("Shareholder not found for editing.");
+    }
   };
 
 
@@ -1499,6 +1615,13 @@ const EquityManagementApp = () => {
     { key: 'percentageChange', header: '% Change', isSortable: true, render: (row) => <span style={{ color: row.percentageChange > 0 ? 'green' : 'red' }}>{row.percentageChange.toFixed(2)}%</span> },
   ];
 
+  // Columns for Companies table (new)
+  const companiesTableColumns = [
+    { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
+    { key: 'description', header: 'Description', isSortable: true },
+    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || ''}, ${row.address.state}, ${row.address.country}` : 'N/A' },
+  ];
+
 
   if (loading) {
     return (
@@ -1647,6 +1770,7 @@ const EquityManagementApp = () => {
           {[
             { id: 'productSelect', name: 'Product Select', icon: Settings }, // New Product Select
             { id: 'equityHome', name: 'Equity Home', icon: BarChart3 }, // Renamed Dashboard
+            { id: 'companies', name: 'Companies', icon: Building2 }, // New Companies menu item
             { id: 'shareholders', name: 'Shareholders', icon: Users },
             { id: 'issuances', name: 'Share Issuances', icon: PlusCircle },
             { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload },
@@ -1683,6 +1807,9 @@ const EquityManagementApp = () => {
                 )}
                 {activeTab === 'equityHome' && (
                   <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Home</h1>
+                )}
+                {activeTab === 'companies' && (
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Companies</h1>
                 )}
                 {activeTab === 'shareholders' && (
                   <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholders</h1>
@@ -1897,6 +2024,15 @@ const EquityManagementApp = () => {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {activeTab === 'companies' && (
+                <CompaniesPage
+                  companies={companies}
+                  onEditCompany={handleEditCompany}
+                  onDeleteCompany={handleDeleteCompany}
+                  addError={addError}
+                />
               )}
 
               {activeTab === 'shareholders' && (
@@ -2320,9 +2456,27 @@ const EquityManagementApp = () => {
           <CompanyForm onSubmit={createCompany} onCancel={() => setShowCreateCompany(false)} />
         </Modal>
       )}
+      {showEditCompany && editingCompanyData && (
+        <Modal onClose={() => setShowEditCompany(false)}>
+          <CompanyForm
+            onSubmit={(data) => updateCompany(editingCompanyData.id, data)}
+            onCancel={() => setShowEditCompany(false)}
+            initialData={editingCompanyData}
+          />
+        </Modal>
+      )}
       {showCreateShareholder && (
         <Modal onClose={() => setShowCreateShareholder(false)}>
           <ShareholderForm onSubmit={createShareholder} onCancel={() => setShowCreateShareholder(false)} />
+        </Modal>
+      )}
+      {showEditShareholder && editingShareholderData && (
+        <Modal onClose={() => setShowEditShareholder(false)}>
+          <ShareholderForm
+            onSubmit={(data) => updateShareholder(editingShareholderData.id, data)}
+            onCancel={() => setShowEditShareholder(false)}
+            initialData={editingShareholderData}
+          />
         </Modal>
       )}
       {showCreateShareClass && (
@@ -2424,8 +2578,12 @@ const Modal = ({ children, onClose }) => (
 );
 
 // Form Components
-const CompanyForm = ({ onSubmit, onCancel }) => {
-  const [data, setData] = useState({ name: '', description: '', address: null });
+const CompanyForm = ({ onSubmit, onCancel, initialData = {} }) => {
+  const [data, setData] = useState({
+    name: initialData.name || '',
+    description: initialData.description || '',
+    address: initialData.address || { line1: '', line2: '', country: '', state: '', postcode: '' }
+  });
 
   const handleAddressChange = (address) => {
       setData(prev => ({ ...prev, address }));
@@ -2437,7 +2595,7 @@ const CompanyForm = ({ onSubmit, onCancel }) => {
   };
   return (
     <form onSubmit={handleSubmit}>
-      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Create New Company</h3>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>{initialData.id ? 'Edit Company' : 'Create New Company'}</h3>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
@@ -2458,7 +2616,7 @@ const CompanyForm = ({ onSubmit, onCancel }) => {
             rows="3"
           />
         </div>
-        <AddressForm onAddressChange={handleAddressChange} />
+        <AddressForm initialAddress={data.address} onAddressChange={handleAddressChange} />
       </div>
       <div className="flex justify-end space-x-2 mt-6">
         <button
@@ -2472,22 +2630,26 @@ const CompanyForm = ({ onSubmit, onCancel }) => {
           type="submit"
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
-          Create Company
+          {initialData.id ? 'Update Company' : 'Create Company'}
         </button>
       </div>
     </form>
   );
 };
 
-const ShareholderForm = ({ onSubmit, onCancel }) => {
-  const [data, setData] = useState({ name: '', email: '', type: SHAREHOLDER_TYPES[0] }); // Default to first SHAREHOLDER_TYPE
+const ShareholderForm = ({ onSubmit, onCancel, initialData = {} }) => {
+  const [data, setData] = useState({
+    name: initialData.name || '',
+    email: initialData.email || '',
+    type: initialData.type || SHAREHOLDER_TYPES[0]
+  }); // Default to first SHAREHOLDER_TYPE
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit(data);
   };
   return (
     <form onSubmit={handleSubmit}>
-      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Add New Shareholder</h3>
+      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>{initialData.id ? 'Edit Shareholder' : 'Add New Shareholder'}</h3>
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -2534,7 +2696,7 @@ const ShareholderForm = ({ onSubmit, onCancel }) => {
           type="submit"
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
-          Add Shareholder
+          {initialData.id ? 'Update Shareholder' : 'Add Shareholder'}
         </button>
       </div>
     </form>
@@ -3054,7 +3216,7 @@ const UserProfileForm = ({ userProfile, onSubmit, addError }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
           <textarea
             value={profileData.address}
-            onChange={(e) => setProfileData({...profileData, address: e.target.value})}
+            onChange={(e) => setProfileData({...profileData.address, address: e.target.value})}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows="3"
           />
@@ -3079,7 +3241,6 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
-    // Use addError instead of setErrorMessage
     if (newPassword !== confirmPassword) {
       addError('New password and confirmation do not match.');
       return;
@@ -3255,6 +3416,39 @@ const AddressForm = ({ initialAddress, onAddressChange }) => {
         <label className="block text-sm font-medium text-gray-700 mb-1">Postcode or Zip</label>
         <input type="text" value={address.postcode} onChange={(e) => handleChange('postcode', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
       </div>
+    </div>
+  );
+};
+
+// New CompaniesPage Component
+const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError }) => {
+  const companyTableColumns = [
+    { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
+    { key: 'description', header: 'Description', isSortable: true },
+    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || ''}, ${row.address.state}, ${row.address.country}` : 'N/A' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Your Companies</h2>
+      <div className="flex justify-end">
+        <button
+          onClick={() => { /* Implement create new company modal */ }}
+          className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
+          style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
+        >
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Create New Company
+        </button>
+      </div>
+      <SortableTable
+        data={companies}
+        columns={companyTableColumns}
+        entityType="company"
+        onRowEdit={onEditCompany}
+        onRowDelete={onDeleteCompany}
+        addError={addError}
+      />
     </div>
   );
 };
