@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Shareholding Summary</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background-color: #1a73e8;
+            color: #ffffff;
+            padding: 10px 20px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+        }
+        .content {
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            font-size: 0.8em;
+            color: #777777;
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #eeeeee;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background-color: #f9f9f9;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-left: 3px solid #34a853;
+            border-radius: 4px;
+        }
+        strong {
+            color: #202124;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Kapitalized Equity Management</h2>
+        </div>
+        <div class="content">
+            <p>Dear {{shareholder_name}},</p>
+            <p>This email provides a summary of your current shareholdings in <strong>{{company_name}}</strong>.</p>
+            
+            <h3>Your Share Issuances:</h3>
+            {{issuances_list_html}}
+
+            <p>If you have any questions regarding your shareholdings, please do not hesitate to contact us at <a href="mailto:{{contact_email}}">{{contact_email}}</a>.</p>
+            <p>Sincerely,</p>
+            <p>The Kapitalized Team</p>
+        </div>
+        <div class="footer">
+            <p>&copy; {{current_year}} Kapitalized. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
