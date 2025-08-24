@@ -27,3 +27,18 @@ Hosted at Vercel with build from this Github repo, current live version is at Py
 The admin function is at https://kapitalized-equity-git-python-app-kapitalizeds-projects.vercel.app/adminhq
 
 There's a supabase setup to manage data and user auth and emails.
+
+**Backend (Python)**
+The backend is an API built with the FastAPI framework, as specified in api/requirements.txt and implemented in api/equity-calculator.py. It is designed to be hosted on Vercel.
+
+**API Endpoints: The backend has endpoints:**
+
+/api/equity-calculator (POST): This is the main endpoint for the equity calculation logic. It takes a payload of current company data and, optionally, a future issuance, and returns the calculated current and future equity states.
+
+/api/admin/{entity} (GET): Fetches all data for a specified entity (e.g., 'users', 'companies', 'issuances') for the admin panel.
+
+/api/admin/{entity}/{item_id} (DELETE): Deletes a specific item by ID, with special logic to handle cascading deletions for a company.
+
+Dependencies: The primary dependencies are supabase for database interaction, pandas for data manipulation, and fastapi for the web server.
+
+
