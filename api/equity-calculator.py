@@ -62,6 +62,11 @@ class CalculationPayload(BaseModel):
     shareClasses: List[ShareClass]
     futureIssuance: Optional[FutureIssuance] = None
 
+# New Pydantic model for email notification payload
+class EmailNotificationPayload(BaseModel):
+    company_id: str # Assuming company IDs are strings (UUIDs)
+    shareholder_ids: List[int]
+
 # --- Core Calculation Logic (Refactored) ---
 
 def calculate_equity_snapshot(issuances_data: List[dict], shareholders_data: List[dict], share_classes_data: List[dict]):
@@ -102,6 +107,40 @@ def calculate_equity_snapshot(issuances_data: List[dict], shareholders_data: Lis
         "shareholderSummary": summary.to_dict('records')
     }
 
+# --- Email Sending Placeholder (Replace with Brevo/SMTP integration) ---
+def send_shareholder_email(to_email: str, subject: str, body: str):
+    """
+    Placeholder function to send email.
+    In a real application, replace this with actual Brevo/SMTP integration.
+    """
+    print(f"\n--- Sending Email ---")
+    print(f"To: {to_email}")
+    print(f"Subject: {subject}")
+    print(f"Body:\n{body}")
+    print(f"---------------------\n")
+    # Example for Brevo integration (requires Brevo SDK or HTTP calls)
+    # from sib_api_v3_sdk.rest import ApiException
+    # from sib_api_v3_sdk import Configuration, ApiClient, TransactionalEmailsApi, SendSmtpEmail
+    #
+    # configuration = Configuration()
+    # configuration.api_key['api-key'] = os.environ.get("BREVO_API_KEY")
+    #
+    # api_instance = TransactionalEmailsApi(ApiClient(configuration))
+    # send_smtp_email = SendSmtpEmail(
+    #     to=[{"email": to_email}],
+    #     subject=subject,
+    #     html_content=f"<html><body>{body.replace('\n', '<br>')}</body></html>",
+    #     sender={"name": "Kapitalized", "email": "no-reply@kapitalized.com"}
+    # )
+    #
+    # try:
+    #     api_response = api_instance.send_transac_email(send_smtp_email)
+    #     print(f"Brevo API response: {api_response}")
+    # except ApiException as e:
+    #     print(f"Exception when calling SMTPApi->send_transac_email: {e}")
+    #     raise HTTPException(status_code=500, detail=f"Failed to send email via Brevo: {e}")
+
+
 # --- API Endpoints ---
 
 @app.post("/api/equity-calculator")
@@ -122,9 +161,10 @@ async def get_equity_calculation(payload: CalculationPayload):
             future_issuance_dict['share_class_id'] = future_issuance_dict.pop('shareClassId')
             future_issuance_dict['price_per_share'] = future_issuance_dict.pop('pricePerShare')
             future_issuance_dict['issue_date'] = future_issuance_dict.pop('issueDate')
+            # Assuming 'round' from frontend is 'roundNumber' and 'roundTitle' is 'round_description'
+            future_issuance_dict['round'] = future_issuance_dict.pop('roundNumber') # Use roundNumber for round
+            future_issuance_dict['round_description'] = future_issuance_dict.pop('roundTitle') # Use roundTitle for round_description
             future_issuance_dict['id'] = 999999 # Dummy ID for calculation
-            future_issuance_dict['round_description'] = future_issuance_dict.pop('round') # Map round from frontend to round_description in backend
-            future_issuance_dict['round'] = 999999 # Dummy round number for future issuance
 
             all_issuances = current_issuances_dict + [future_issuance_dict]
             future_state = calculate_equity_snapshot(all_issuances, shareholders_dict, share_classes_dict)
@@ -184,7 +224,7 @@ async def get_admin_data(entity: str):
         raise HTTPException(status_code=500, detail=f"Failed to fetch {entity}: {e}")
 
 @app.delete("/api/admin/{entity}/{item_id}")
-async def delete_admin_data(entity: str, item_id: int):
+async def delete_admin_data(entity: str, item_id: str): # Changed item_id to str for UUIDs
     """Endpoint to delete data from the admin panel."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase client not initialized.")
@@ -203,19 +243,20 @@ async def delete_admin_data(entity: str, item_id: int):
         # Before deleting a company, delete associated issuances, shareholders, and share classes
         if entity == "companies":
             # Delete issuances associated with the company
-            await supabase.from_("share_issuances").delete().eq("company_id", item_id).execute()
+            supabase.from_("share_issuances").delete().eq("company_id", item_id).execute()
             # Delete shareholders associated with the company
-            await supabase.from_("shareholders").delete().eq("company_id", item_id).execute()
+            supabase.from_("shareholders").delete().eq("company_id", item_id).execute()
             # Delete share classes associated with the company
-            await supabase.from_("share_classes").delete().eq("company_id", item_id).execute()
+            supabase.from_("share_classes").delete().eq("company_id", item_id).execute()
         elif entity == "users":
             # For users, delete the profile first. The auth.users record cannot be deleted from client-side.
             # The backend can delete auth.users records using the admin client.
-            await supabase.from_("user_profiles").delete().eq("id", item_id).execute()
+            supabase.from_("user_profiles").delete().eq("id", item_id).execute()
             # Also delete user's companies, which will cascade to other related data
             companies_to_delete_response = supabase.from_("companies").select('id').eq('user_id', item_id).execute()
             for company in companies_to_delete_response.data:
                 # Recursively call delete for company
+                # Note: This recursive call will handle issuances, shareholders, shareclasses for each company
                 await delete_admin_data("companies", company['id'])
             
             # Finally, delete the user from auth.users using the admin client
@@ -235,9 +276,88 @@ async def delete_admin_data(entity: str, item_id: int):
     except Exception as e:
         # Supabase client errors might be in response.error
         error_detail = str(e)
-        if hasattr(response, 'error') and response.error: # Check if 'response' exists and has 'error'
+        # Ensure 'response' exists before trying to access its 'error' attribute
+        if 'response' in locals() and hasattr(response, 'error') and response.error:
             error_detail = response.error.message
         raise HTTPException(status_code=500, detail=f"Failed to delete {entity}: {error_detail}")
+
+@app.post("/api/notify-shareholders")
+async def notify_shareholders(payload: EmailNotificationPayload):
+    """
+    Endpoint to send email notifications to selected shareholders.
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+
+    try:
+        company_id = payload.company_id
+        shareholder_ids = payload.shareholder_ids
+
+        # Fetch company details
+        company_response = supabase.from_('companies').select('*').eq('id', company_id).single().execute()
+        company = company_response.data
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found.")
+
+        # Fetch selected shareholders
+        shareholders_response = supabase.from_('shareholders').select('*').in_('id', shareholder_ids).execute()
+        selected_shareholders = shareholders_response.data
+        if not selected_shareholders:
+            raise HTTPException(status_code=404, detail="No selected shareholders found.")
+
+        # Fetch all share classes for the company
+        share_classes_response = supabase.from_('share_classes').select('*').eq('company_id', company_id).execute()
+        share_classes_map = {sc['id']: sc['name'] for sc in share_classes_response.data}
+
+        # Fetch all issuances for the company
+        issuances_response = supabase.from_('share_issuances').select('*').eq('company_id', company_id).execute()
+        all_issuances = issuances_response.data
+
+        emails_sent_count = 0
+        for shareholder in selected_shareholders:
+            if not shareholder.get('email'):
+                print(f"Skipping email for shareholder {shareholder['name']} (ID: {shareholder['id']}) - no email address provided.")
+                continue
+
+            # Filter issuances for the current shareholder
+            shareholder_issuances = [
+                iss for iss in all_issuances
+                if iss['shareholder_id'] == shareholder['id']
+            ]
+
+            email_body_parts = [
+                f"Dear {shareholder['name']},\n",
+                f"This email provides a summary of your shareholdings in {company['name']}.\n",
+                "Your Share Issuances:\n"
+            ]
+
+            if shareholder_issuances:
+                for iss in shareholder_issuances:
+                    share_class_name = share_classes_map.get(iss['share_class_id'], 'Unknown Class')
+                    email_body_parts.append(
+                        f"- Shares: {iss['shares']} of {share_class_name} at ${iss['price_per_share']:.2f} per share "
+                        f"(Total Value: ${iss['shares'] * iss['price_per_share']:.2f}) "
+                        f"on {iss['issue_date']} (Round: {iss.get('round_description', 'N/A')})"
+                    )
+            else:
+                email_body_parts.append("- No share issuances recorded.")
+
+            email_body_parts.append("\nIf you have any questions, please contact us.")
+            email_body_parts.append("\nSincerely,\nThe Kapitalized Team")
+
+            email_subject = f"Your Shareholding Summary in {company['name']}"
+            email_body = "\n".join(email_body_parts)
+
+            send_shareholder_email(shareholder['email'], email_subject, email_body)
+            emails_sent_count += 1
+
+        return {"message": f"Email notifications initiated for {emails_sent_count} shareholders."}
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error in notify_shareholders endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"An internal server error occurred: {e}")
 
 
 # This allows Vercel to run the FastAPI app
