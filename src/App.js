@@ -136,12 +136,12 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
             {sortedData.map((row, rowIndex) => (
               <tr key={row.id || rowIndex}>
                 {columns.map(column => (
-                  <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>
+                  <td key={column.key} className="px-6 py-4 whitespace-nowrap text-xs" style={{ color: theme.lightText }}> {/* Changed to text-xs */}
                     {column.render ? column.render(row) : row[column.key]}
                   </td>
                 ))}
                 {(onRowDelete || onRowEdit) && (
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium"> {/* Changed to text-xs */}
                     {onRowEdit && <button onClick={() => onRowEdit(row.id, entityType)} className="text-blue-600 hover:text-blue-900 mr-2"><Edit className="h-4 w-4" /></button>}
                     {onRowDelete && <button onClick={() => onRowDelete(row.id, entityType)} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>}
                   </td>
@@ -1765,6 +1765,9 @@ const EquityManagementApp = () => {
           {!isSidebarCollapsed && (
             <img src="https://kapitalized.com/wp-content/uploads/KAP-Logo-150px.webp" alt="Kapitalized Logo" className="h-10" />
           )}
+          {isSidebarCollapsed && ( // New: Collapsed logo
+            <img src="https://kapitalized.com/wp-content/uploads/KAP-Round-Letter-Logo-200px.png" alt="Kapitalized Logo" className="h-8 w-8" />
+          )}
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="p-2 rounded-md hover:bg-gray-100 focus:outline-none"
@@ -2088,9 +2091,9 @@ const EquityManagementApp = () => {
                 <div className="space-y-6">
                   <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Issuances</h2>
                   <div className="flex justify-between items-center">
-                    <h2 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Issuances</h2>
+                    {/* Removed duplicate h2 */}
                     <button
-                      onClick={() => setShowCreateIssuance(true)}
+                      onClick={() => setShowCreateIssuance(true)} // Now opens BulkIssuanceForm
                       className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
                       style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
                     >
@@ -2493,11 +2496,11 @@ const EquityManagementApp = () => {
       )}
       {showCreateIssuance && (
         <Modal onClose={() => setShowCreateIssuance(false)}>
-          <IssuanceForm
+          <BulkIssuanceForm // Changed to BulkIssuanceForm
             shareholders={shareholders.filter(s => s.company_id === selectedCompany?.id)}
             shareClasses={shareClasses.filter(sc => sc.company_id === selectedCompany?.id)}
             onSubmit={createIssuance}
-            onCancel={() => setShowCreateIssuance(false)}
+            addError={addError}
           />
         </Modal>
       )}
@@ -3342,14 +3345,14 @@ const SubscriptionPage = ({ userProfile, handleCheckout, loading, addError }) =>
         <p className="text-2xl font-bold" style={{color: isPremiumUser ? theme.secondary : theme.primary}}>
             {isPremiumUser ? 'Premium Plan' : 'Free Plan'}
         </p>
-        <p className="text-sm text-gray-600 mt-2">
+        <p className="text-sm" style={{ color: theme.lightText }}>
             {isPremiumUser ? 'You have access to all premium features.' : 'Your current access is limited to basic features.'}
         </p>
       </div>
       {!isPremiumUser && (
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-bold text-gray-900 mb-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Upgrade to Premium</h3>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm" style={{ color: theme.lightText }}>
               Unlock advanced reports, scenario planning, and unlimited company management.
           </p>
           <button
@@ -3360,7 +3363,7 @@ const SubscriptionPage = ({ userProfile, handleCheckout, loading, addError }) =>
             {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
             Upgrade Now
           </button>
-          <p className="text-sm text-gray-500 mt-4">
+          <p className="text-sm" style={{ color: theme.lightText }}>
             You will be redirected to your WooCommerce site to complete the subscription.
           </p>
         </div>
