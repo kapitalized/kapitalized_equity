@@ -6,9 +6,9 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-# Import for Brevo (uncomment and install if using Brevo)
-# from sib_api_v3_sdk.rest import ApiException
-# from sib_api_v3_sdk import Configuration, ApiClient, TransactionalEmailsApi, SendSmtpEmail
+# Import for Brevo (uncommented)
+from sib_api_v3_sdk.rest import ApiException
+from sib_api_v3_sdk import Configuration, ApiClient, TransactionalEmailsApi, SendSmtpEmail
 
 # --- Configuration and Initialization ---
 
@@ -18,7 +18,7 @@ app = FastAPI()
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-# BREVO_API_KEY = os.environ.get("BREVO_API_KEY") # Uncomment if using Brevo
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY") # Uncommented
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("CRITICAL: Supabase environment variables not set.")
@@ -112,40 +112,43 @@ def calculate_equity_snapshot(issuances_data: List[dict], shareholders_data: Lis
         "shareholderSummary": summary.to_dict('records')
     }
 
-# --- Email Sending Placeholder (Replace with Brevo/SMTP integration) ---
+# --- Email Sending Integration (Brevo) ---
 def send_shareholder_email(to_email: str, subject: str, html_body: str):
     """
-    Placeholder function to send email.
-    In a real application, replace this with actual Brevo/SMTP integration.
+    Sends an email using Brevo (Sendinblue) API.
+    Requires BREVO_API_KEY environment variable to be set.
     """
-    print(f"\n--- Sending Email ---")
+    print(f"\n--- Attempting to Send Email via Brevo ---")
     print(f"To: {to_email}")
     print(f"Subject: {subject}")
-    print(f"Body (HTML):\n{html_body}")
-    print(f"---------------------\n")
+    print(f"Body (HTML):\n{html_body[:200]}...") # Print first 200 chars to avoid clutter
+    print(f"-----------------------------------------\n")
 
-    # Example for Brevo integration (requires Brevo SDK and BREVO_API_KEY environment variable)
-    # if not BREVO_API_KEY:
-    #     print("WARNING: BREVO_API_KEY not set. Cannot send actual emails.")
-    #     return
-    #
-    # configuration = Configuration()
-    # configuration.api_key['api-key'] = BREVO_API_KEY
-    #
-    # api_instance = TransactionalEmailsApi(ApiClient(configuration))
-    # send_smtp_email = SendSmtpEmail(
-    #     to=[{"email": to_email}],
-    #     subject=subject,
-    #     html_content=html_body,
-    #     sender={"name": "Kapitalized", "email": "no-reply@kapitalized.com"} # Replace with your sender email
-    # )
-    #
-    # try:
-    #     api_response = api_instance.send_transac_email(send_smtp_email)
-    #     print(f"Brevo API response: {api_response}")
-    # except ApiException as e:
-    #     print(f"Exception when calling SMTPApi->send_transac_email: {e}")
-    #     raise HTTPException(status_code=500, detail=f"Failed to send email via Brevo: {e}")
+    if not BREVO_API_KEY:
+        print("WARNING: BREVO_API_KEY not set. Cannot send actual emails via Brevo.")
+        return
+
+    configuration = Configuration()
+    configuration.api_key['api-key'] = BREVO_API_KEY
+
+    api_instance = TransactionalEmailsApi(ApiClient(configuration))
+    send_smtp_email = SendSmtpEmail(
+        to=[{"email": to_email}],
+        subject=subject,
+        html_content=html_body,
+        sender={"name": "Kapitalized", "email": "hello@kapitalized.com"} # IMPORTANT: Replace with your verified sender email in Brevo
+    )
+
+    try:
+        api_response = api_instance.send_transac_email(send_smtp_email)
+        print(f"Brevo API response: {api_response}")
+    except ApiException as e:
+        print(f"Exception when calling SMTPApi->send_transac_email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email via Brevo: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred during Brevo email sending: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during email sending: {e}")
+
 
 def load_email_template(template_name: str, context: dict) -> str:
     """
@@ -375,7 +378,8 @@ async def notify_shareholders(payload: EmailNotificationPayload):
                 "shareholder_name": shareholder['name'],
                 "company_name": company['name'],
                 "issuances_list_html": f"<ul>{issuances_html}</ul>",
-                "contact_email": "support@kapitalized.com" # Example contact email
+                "contact_email": "support@kapitalized.com", # Example contact email
+                "current_year": datetime.now().year # Added current year for footer
             }
 
             email_subject = f"Your Shareholding Summary in {company['name']}"
