@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle } from 'lucide-react';
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 // import { createClient } from '@supabase/supabase-js'; // Removed direct import
@@ -57,6 +57,118 @@ const SHAREHOLDER_TYPES = [
   'Other'
 ];
 
+// --- Reusable SortableTable Component ---
+const SortableTable = ({ data, columns, onRowDelete, entityType, addError }) => {
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const handleSort = (columnKey) => {
+    if (sortColumn === columnKey) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredData = data.filter(row =>
+    Object.values(row).some(value =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
+  const sortedData = _.orderBy(filteredData, [sortColumn], [sortDirection]);
+
+  const calculateTotals = () => {
+    const totals = {};
+    columns.forEach(col => {
+      if (col.isSummable && col.key) {
+        totals[col.key] = _.sumBy(filteredData, col.key);
+      }
+    });
+    return totals;
+  };
+
+  const totals = calculateTotals();
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder={`Filter ${entityType}...`}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ borderColor: theme.borderColor }}
+        />
+      </div>
+      <div className="overflow-x-auto bg-white shadow rounded-lg">
+        <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
+          <thead style={{ backgroundColor: theme.background }}>
+            <tr>
+              {columns.map(column => (
+                <th
+                  key={column.key}
+                  className={`px-6 py-3 text-left text-xs font-medium uppercase ${column.isSortable ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                  style={{ color: theme.lightText }}
+                  onClick={() => column.isSortable && handleSort(column.key)}
+                >
+                  <div className="flex items-center">
+                    {column.header}
+                    {column.isSortable && (
+                      <span className="ml-1">
+                        {sortColumn === column.key && sortDirection === 'asc' && <ArrowUp className="h-4 w-4" />}
+                        {sortColumn === column.key && sortDirection === 'desc' && <ArrowDown className="h-4 w-4" />}
+                      </span>
+                    )}
+                  </div>
+                </th>
+              ))}
+              {onRowDelete && (
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
+              )}
+            </tr>
+          </thead>
+          <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
+            {sortedData.map((row, rowIndex) => (
+              <tr key={row.id || rowIndex}>
+                {columns.map(column => (
+                  <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>
+                    {column.render ? column.render(row) : row[column.key]}
+                  </td>
+                ))}
+                {onRowDelete && (
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button onClick={() => onRowDelete(row.id, entityType)} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-4 w-4" /></button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+          {/* Totals Row */}
+          {Object.keys(totals).length > 0 && (
+            <tfoot className="bg-gray-50 font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>
+              <tr>
+                <td className="px-6 py-3 text-left text-sm" style={{ color: theme.text }}>Total ({filteredData.length} {entityType}s)</td>
+                {columns.slice(1).map(column => ( // Skip first column for total label
+                  <td key={`total-${column.key}`} className="px-6 py-3 text-left text-sm" style={{ color: theme.text }}>
+                    {column.isSummable ? (column.key === 'totalValue' ? `$${totals[column.key].toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : totals[column.key].toLocaleString()) : ''}
+                  </td>
+                ))}
+                {onRowDelete && <td className="px-6 py-3"></td>} {/* Empty cell for actions column */}
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+};
+// --- END Reusable SortableTable Component ---
+
 
 const AdminDashboard = ({ addError }) => {
   const [loadingAdminData, setLoadingAdminData] = useState(true);
@@ -64,12 +176,10 @@ const AdminDashboard = ({ addError }) => {
   const [allCompanies, setAllCompanies] = useState([]);
   const [allIssuances, setAllIssuances] = useState([]);
   const [currentView, setCurrentView] = useState('users');
-  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAllAdminData = async () => {
     setLoadingAdminData(true);
     try {
-      // Corrected fetch URLs to align with FastAPI /api/admin/{entity} structure
       const [usersResponse, companiesResponse, issuancesResponse] = await Promise.all([
         fetch(`${ADMIN_BACKEND_BASE_URL}/users`),
         fetch(`${ADMIN_BACKEND_BASE_URL}/companies`),
@@ -101,10 +211,7 @@ const AdminDashboard = ({ addError }) => {
   }, []);
 
   const handleAdminDelete = async (id, type) => {
-    // Custom modal for confirmation instead of window.confirm
     const confirmed = await new Promise(resolve => {
-        // This is a placeholder for a custom modal.
-        // In a real app, you'd show a modal component here and resolve based on user's choice.
         const userConfirmed = window.confirm(`Are you sure you want to delete this ${type}? This cannot be undone.`);
         resolve(userConfirmed);
     });
@@ -113,9 +220,7 @@ const AdminDashboard = ({ addError }) => {
 
     setLoadingAdminData(true);
     try {
-      // Corrected DELETE URL to align with FastAPI /api/admin/{entity}/{id} structure
-      // Note: 'type' here is singular (user, company, issuance), so we pluralize for the URL.
-      const entityPath = type + 's'; // e.g., 'users', 'companies', 'issuances'
+      const entityPath = type + 's';
       const response = await fetch(`${ADMIN_BACKEND_BASE_URL}/${entityPath}/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -125,9 +230,8 @@ const AdminDashboard = ({ addError }) => {
         const errorData = await response.json();
         throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorData.detail || errorData.error}`);
       }
-      // Use a custom modal or toast for success instead of alert
-      console.log(`${type} deleted successfully!`); // Placeholder for success message
-      fetchAllAdminData(); // Refresh data after deletion
+      console.log(`${type} deleted successfully!`);
+      fetchAllAdminData();
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
       addError(`Failed to delete ${type}: ` + error.message);
@@ -136,15 +240,28 @@ const AdminDashboard = ({ addError }) => {
     }
   };
 
-  const filteredUsers = allUsers.filter(user =>
-    Object.values(user).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-  const filteredCompanies = allCompanies.filter(company =>
-    Object.values(company).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-  const filteredIssuances = allIssuances.filter(issuance =>
-    Object.values(issuance).some(val => String(val).toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const userColumns = [
+    { key: 'id', header: 'ID', isSortable: true, render: (row) => row.id.substring(0, 8) + '...' },
+    { key: 'full_name', header: 'Full Name', isSortable: true },
+    { key: 'email', header: 'Email', isSortable: true },
+    { key: 'created_at', header: 'Created At', isSortable: true, render: (row) => new Date(row.created_at).toLocaleDateString() },
+  ];
+
+  const companyColumns = [
+    { key: 'id', header: 'ID', isSortable: true, render: (row) => row.id.substring(0, 8) + '...' },
+    { key: 'name', header: 'Name', isSortable: true },
+    { key: 'description', header: 'Description', isSortable: true },
+    { key: 'user_id', header: 'Owner User ID', isSortable: true, render: (row) => row.user_id.substring(0, 8) + '...' },
+  ];
+
+  const issuanceColumns = [
+    { key: 'id', header: 'ID', isSortable: true, render: (row) => row.id.substring(0, 8) + '...' },
+    { key: 'company_id', header: 'Company ID', isSortable: true, render: (row) => row.company_id.substring(0, 8) + '...' },
+    { key: 'shareholder_id', header: 'Shareholder ID', isSortable: true, render: (row) => row.shareholder_id.substring(0, 8) + '...' },
+    { key: 'shares', header: 'Shares', isSortable: true, isSummable: true },
+    { key: 'price_per_share', header: 'Price/Share', isSortable: true },
+  ];
+
 
   if (loadingAdminData) {
     return (
@@ -165,100 +282,42 @@ const AdminDashboard = ({ addError }) => {
           <button onClick={() => setCurrentView('issuances')} className={`px-4 py-2 text-sm font-medium rounded-md ${currentView === 'issuances' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Issuances</button>
         </div>
       </div>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input type="text" placeholder={`Filter ${currentView}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" style={{ borderColor: theme.borderColor }} />
-      </div>
       <div className="bg-white shadow rounded-lg p-6">
-        {/* Render tables based on currentView */}
         {currentView === 'users' && (
-            <div className="overflow-x-auto">
-                <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Users</h3>
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
-                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredUsers.map((userItem) => (
-                            <tr key={userItem.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{userItem.id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userItem.full_name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{userItem.email}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(userItem.created_at).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button onClick={() => handleAdminDelete(userItem.id, 'user')} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-5 w-5"/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+          <>
+            <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Users</h3>
+            <SortableTable
+              data={allUsers}
+              columns={userColumns}
+              onRowDelete={handleAdminDelete}
+              entityType="user"
+              addError={addError}
+            />
+          </>
         )}
         {currentView === 'companies' && (
-            <div className="overflow-x-auto">
-                <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Companies</h3>
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User ID</th>
-                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredCompanies.map((companyItem) => (
-                            <tr key={companyItem.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{companyItem.id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{companyItem.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{companyItem.description}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{companyItem.user_id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button onClick={() => handleAdminDelete(companyItem.id, 'company')} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-5 w-5"/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+          <>
+            <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Companies</h3>
+            <SortableTable
+              data={allCompanies}
+              columns={companyColumns}
+              onRowDelete={handleAdminDelete}
+              entityType="company"
+              addError={addError}
+            />
+          </>
         )}
         {currentView === 'issuances' && (
-            <div className="overflow-x-auto">
-                <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Issuances</h3>
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company ID</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shareholder ID</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shares</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price/Share</th>
-                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredIssuances.map((issuanceItem) => (
-                            <tr key={issuanceItem.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{issuanceItem.id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.company_id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.shareholder_id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.shares}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{issuanceItem.price_per_share}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button onClick={() => handleAdminDelete(issuanceItem.id, 'issuance')} className="text-red-600 hover:text-red-900 ml-4"><Trash2 className="h-5 w-5"/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+          <>
+            <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Issuances</h3>
+            <SortableTable
+              data={allIssuances}
+              columns={issuanceColumns}
+              onRowDelete={handleAdminDelete}
+              entityType="issuance"
+              addError={addError}
+            />
+          </>
         )}
       </div>
     </div>
@@ -401,14 +460,13 @@ const EquityManagementApp = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('payment') === 'success') {
-      // Use custom modal or toast instead of alert
-      addError('Payment successful! Your premium features should now be active.'); // Re-using addError for a temporary success display
+      addError('Payment successful! Your premium features should now be active.');
       window.history.replaceState({}, document.title, window.location.pathname);
       if (user) {
         fetchUserProfile(user.id);
       }
     } else if (params.get('payment') === 'cancelled') {
-      addError('Payment was cancelled. You still have free access.'); // Re-using addError
+      addError('Payment was cancelled. You still have free access.');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [user]);
@@ -416,7 +474,7 @@ const EquityManagementApp = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setErrors([]); // Clear errors before new attempt
+    setErrors([]);
     setSignUpSuccessMessage('');
     setLoading(true);
     if (!supabase) {
@@ -436,7 +494,7 @@ const EquityManagementApp = () => {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    setErrors([]); // Clear errors before new attempt
+    setErrors([]);
     setSignUpSuccessMessage('');
     setLoading(true);
     if (!supabase) {
@@ -478,7 +536,7 @@ const EquityManagementApp = () => {
 
   const handleLogout = async () => {
     setLoading(true);
-    setErrors([]); // Clear errors
+    setErrors([]);
     if (!supabase) {
       addError("Supabase client not initialized.");
       setLoading(false);
@@ -628,7 +686,6 @@ const EquityManagementApp = () => {
 
       if (error) throw error;
       setUserProfile({ ...userProfile, ...dataToUpdate });
-      // Use custom modal or toast for success instead of alert
       addError('Profile updated successfully!');
     } catch (error) {
       addError('Error updating profile: ' + error.message);
@@ -649,7 +706,6 @@ const EquityManagementApp = () => {
         password: newPassword,
       });
       if (error) throw error;
-      // Use custom modal or toast for success instead of alert
       addError('Password updated successfully!');
     } catch (error) {
       addError('Error updating password: ' + error.message);
@@ -1101,10 +1157,13 @@ const EquityManagementApp = () => {
     if (!selectedCompany) return [];
     const companyIssuances = issuancesToProcess.filter(i => i.company_id === selectedCompany.id);
 
-    return _(companyIssuances)
+    // Get all shareholders for the selected company, even those without issuances
+    const allCompanyShareholders = shareholders.filter(sh => sh.company_id === selectedCompany.id);
+
+    const shareholderSummary = _(companyIssuances)
       .groupBy('shareholder_id')
       .map((issuances, shareholderId) => {
-        const shareholder = shareholders.find(s => s.id == shareholderId);
+        const shareholder = allCompanyShareholders.find(s => s.id == shareholderId);
         const totalShares = _.sumBy(issuances, 'shares');
         const totalValue = _.sumBy(issuances, i => i.shares * i.price_per_share);
 
@@ -1124,8 +1183,22 @@ const EquityManagementApp = () => {
           }))
         };
       })
-      .orderBy('totalShares', 'desc')
       .value();
+
+    // Add shareholders with no issuances
+    const shareholdersWithNoIssuances = allCompanyShareholders.filter(sh =>
+      !shareholderSummary.some(summary => summary.id == sh.id)
+    ).map(sh => ({
+      id: sh.id,
+      name: sh.name,
+      email: sh.email,
+      type: sh.type,
+      totalShares: 0,
+      totalValue: 0,
+      holdings: []
+    }));
+
+    return _.orderBy([...shareholderSummary, ...shareholdersWithNoIssuances], ['totalShares'], ['desc']);
   };
 
   const fetchEquityCalculations = async (futureIssuance = null) => {
@@ -1473,6 +1546,60 @@ const EquityManagementApp = () => {
 
   const companyData = getCompanyData();
   const shareholderData = getShareholderData();
+
+  // Columns for Shareholder table
+  const shareholderTableColumns = [
+    { key: 'name', header: 'Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
+    { key: 'email', header: 'Email', isSortable: true },
+    { key: 'type', header: 'Type', isSortable: true },
+    { key: 'totalShares', header: 'Total Shares', isSortable: true, isSummable: true, render: (row) => row.totalShares.toLocaleString() },
+    { key: 'totalValue', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+    { key: 'holdings', header: 'Holdings Details', isSortable: false, render: (row) => (
+        row.holdings.map((holding, idx) => (
+            <div key={idx} className="mb-1">
+                {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round} - {holding.roundTitle || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+        ))
+      )
+    },
+  ];
+
+  // Columns for Issuances table
+  const issuanceTableColumns = [
+    { key: 'issue_date', header: 'Date', isSortable: true },
+    { key: 'round', header: 'Round', isSortable: true, render: (row) => `${row.round} (${row.round_description || 'N/A'})` },
+    { key: 'shareholder_name', header: 'Shareholder', isSortable: true, render: (row) => shareholders.find(s => s.id === row.shareholder_id)?.name || 'Unknown' },
+    { key: 'share_class_name', header: 'Share Class', isSortable: true, render: (row) => shareClasses.find(sc => sc.id === row.share_class_id)?.name || 'Unknown' },
+    { key: 'shares', header: 'Shares', isSortable: true, isSummable: true, render: (row) => row.shares.toLocaleString() },
+    { key: 'price_per_share', header: 'Price/Share', isSortable: true, render: (row) => `$${row.price_per_share.toFixed(2)}` },
+    { key: 'total_value', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${(row.shares * row.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+  ];
+
+  // Columns for Share Classes table (in Equity Home)
+  const shareClassSummaryColumns = [
+    { key: 'name', header: 'Class', isSortable: true },
+    { key: 'totalShares', header: 'Shares', isSortable: true, isSummable: true, render: (row) => row.totalShares.toLocaleString() },
+    { key: 'totalValue', header: 'Value', isSortable: true, isSummable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+    { key: 'percentage', header: '%', isSortable: true, render: (row) => `${row.percentage}%` },
+    { key: 'round_info', header: 'Round', isSortable: true, render: (row) => `${row.round} (${row.roundTitle})` },
+  ];
+
+  // Columns for Shareholder Holdings in Reports tab
+  const reportShareholderHoldingsColumns = [
+    { key: 'name', header: 'Name', isSortable: true },
+    { key: 'totalShares', header: 'Shares', isSummable: true, isSortable: true, render: (row) => row.totalShares.toLocaleString() },
+    { key: 'totalValue', header: 'Value', isSummable: true, isSortable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+    { key: 'percentage', header: 'Percentage', isSortable: true, render: (row) => `${((row.totalShares / (displayEquityData.companyData.totalShares || 1)) * 100).toFixed(2)}%` },
+  ];
+
+  // Columns for Future Scenario Shareholder Impact
+  const futureShareholderImpactColumns = [
+    { key: 'name', header: 'Name', isSortable: true },
+    { key: 'currentPercentage', header: 'Current Shareholding %', isSortable: true, render: (row) => `${row.currentPercentage.toFixed(2)}%` },
+    { key: 'futurePercentage', header: 'Future Shareholding %', isSortable: true, render: (row) => `${row.futurePercentage.toFixed(2)}%` },
+    { key: 'percentageChange', header: '% Change', isSortable: true, render: (row) => <span style={{ color: row.percentageChange > 0 ? 'green' : 'red' }}>{row.percentageChange.toFixed(2)}%</span> },
+  ];
+
 
   if (loading) {
     return (
@@ -1853,30 +1980,12 @@ const EquityManagementApp = () => {
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
                       <h3 className="lg:text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Classes (by Priority)</h3>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                          <thead style={{ backgroundColor: theme.background }}>
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Class</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Value</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>%</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
-                            </tr>
-                          </thead>
-                          <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                            {companyData.classSummary.map((item, index) => (
-                              <tr key={item.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{item.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.totalShares.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.percentage}%</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{item.round} ({item.roundTitle})</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <SortableTable
+                        data={companyData.classSummary}
+                        columns={shareClassSummaryColumns}
+                        entityType="share class"
+                        addError={addError}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1913,40 +2022,13 @@ const EquityManagementApp = () => {
                       </button>
                     </div>
                   </div>
-                  <div className="bg-white shadow rounded-lg" style={{ backgroundColor: theme.cardBackground }}>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                        <thead style={{ backgroundColor: theme.background }}>
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Type</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Total Shares</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Total Value</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Holdings Details</th>
-                          </tr>
-                        </thead>
-                        <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                          {shareholderData.map(shareholder => (
-                            <tr key={shareholder.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{shareholder.name}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareholder.email}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareholder.type}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareholder.totalShares.toLocaleString()}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${shareholder.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                              <td className="px-6 py-4 text-sm" style={{ color: theme.lightText }}>
-                                {shareholder.holdings.map((holding, idx) => (
-                                  <div key={idx} className="mb-1">
-                                    {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round} - {holding.roundTitle || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                  </div>
-                                ))}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  <SortableTable
+                    data={shareholderData}
+                    columns={shareholderTableColumns}
+                    entityType="shareholder"
+                    addError={addError}
+                    onRowDelete={() => { /* Implement if needed */ }}
+                  />
                 </div>
               )}
 
@@ -1964,51 +2046,13 @@ const EquityManagementApp = () => {
                       New Issuance
                     </button>
                   </div>
-                  <div className="bg-white shadow rounded-lg" style={{ backgroundColor: theme.cardBackground }}>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                        <thead style={{ backgroundColor: theme.background }}>
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Date</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Round</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shareholder</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Share Class</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Price/Share</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Total Value</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                          {shareIssuances
-                            .filter(issuance => issuance.company_id === selectedCompany.id)
-                            .map(issuance => {
-                              const shareholder = shareholders.find(s => s.id === issuance.shareholder_id);
-                              const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
-                              return (
-                                <tr key={issuance.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.issue_date}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.round} ({issuance.round_description || 'N/A'})</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{shareholder?.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{shareClass?.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{issuance.shares.toLocaleString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${issuance.price_per_share.toFixed(2)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${(issuance.shares * issuance.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button
-                                      onClick={() => deleteIssuance(issuance.id)}
-                                      className="text-red-600 hover:text-red-800"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  <SortableTable
+                    data={shareIssuances.filter(issuance => issuance.company_id === selectedCompany.id)}
+                    columns={issuanceTableColumns}
+                    onRowDelete={deleteIssuance}
+                    entityType="issuance"
+                    addError={addError}
+                  />
                 </div>
               )}
 
@@ -2065,30 +2109,12 @@ const EquityManagementApp = () => {
                         <p style={{ color: theme.lightText }}>Total Shares: {companyData.totalShares.toLocaleString()}</p>
                         <p style={{ color: theme.lightText }}>Total Value: ${companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                         <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Shareholder Holdings:</h4>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                            <thead style={{ backgroundColor: theme.background }}>
-                              <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Value</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Percentage</th>
-                              </tr>
-                            </thead>
-                            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                              {currentEquityData.shareholderData.map(sh => (
-                                <tr key={sh.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{sh.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.totalShares.toLocaleString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>
-                                    {((sh.totalShares / currentEquityData.companyData.totalShares) * 100).toFixed(2)}%
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        <SortableTable
+                          data={currentEquityData.shareholderData}
+                          columns={reportShareholderHoldingsColumns}
+                          entityType="shareholder"
+                          addError={addError}
+                        />
                       </div>
                     )}
                   </div>
@@ -2115,30 +2141,12 @@ const EquityManagementApp = () => {
                         <p style={{ color: theme.lightText }}>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
                         <p style={{ color: theme.lightText }}>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                         <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Holdings at Round {displayEquityData.companyData.classSummary[0]?.round} ({displayEquityData.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                            <thead style={{ backgroundColor: theme.background }}>
-                              <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Shares</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Value</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Percentage</th>
-                              </tr>
-                            </thead>
-                            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                              {displayEquityData.shareholderData.map(sh => (
-                                <tr key={sh.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{sh.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.totalShares.toLocaleString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>${sh.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>
-                                    {((sh.totalShares / displayEquityData.companyData.totalShares) * 100).toFixed(2)}%
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        <SortableTable
+                          data={displayEquityData.shareholderData}
+                          columns={reportShareholderHoldingsColumns}
+                          entityType="shareholder"
+                          addError={addError}
+                        />
                       </div>
                     )}
                   </div>
@@ -2302,28 +2310,12 @@ const EquityManagementApp = () => {
                         </div>
 
                         <h5 className="font-bold mt-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Impact:</h5>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
-                            <thead style={{ backgroundColor: theme.cardBackground }}>
-                              <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Current Shareholding %</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>Future Shareholding %</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium uppercase" style={{ color: theme.lightText }}>% Change</th>
-                              </tr>
-                            </thead>
-                            <tbody style={{ backgroundColor: theme.cardBackground, color: theme.text }}>
-                              {futureScenarioResults.future_state.shareholderSummary.map(sh => (
-                                <tr key={sh.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" style={{ color: theme.text }}>{sh.name}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.currentPercentage.toFixed(2)}%</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: theme.lightText }}>{sh.futurePercentage.toFixed(2)}%</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm" style={{ color: sh.percentageChange > 0 ? 'green' : 'red' }}>{sh.percentageChange.toFixed(2)}%</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        <SortableTable
+                          data={futureScenarioResults.future_state.shareholderSummary}
+                          columns={futureShareholderImpactColumns}
+                          entityType="shareholder"
+                          addError={addError}
+                        />
                       </div>
                     )}
                   </div>
@@ -2867,7 +2859,6 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
       }
     }
     if (allSuccessful) {
-      // Use custom modal or toast for success instead of alert
       addError('All issuances added successfully!');
       setIssuances([{ roundNumber: '', roundTitle: '', shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], payment_status: 'No' }]);
     }
@@ -2876,7 +2867,7 @@ const BulkIssuanceForm = ({ shareholders, shareClasses, onSubmit, addError }) =>
   return (
     <form onSubmit={handleSubmitAll}>
       {issuances.map((issuance, index) => (
-        <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md relative"> {/* Added relative for positioning trash icon */}
+        <div key={index} className="mb-6 p-4 border border-gray-200 rounded-md relative">
           <h4 className="text-md font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Issuance #{index + 1}</h4>
           {issuances.length > 1 && (
             <button
@@ -3274,9 +3265,7 @@ const SubscriptionPage = ({ user, handleCheckout, loading, addError }) => {
         <p className="text-gray-700 mb-6">
           Upgrade to our Premium Plan to access all advanced reports, scenario planning, and unlimited company management.
         </p>
-        {/* Changed from errorMessage to errors.map */}
-        {/* Note: This component doesn't directly use 'errors' state, so it still uses a prop for a single error message */}
-        {addError && ( // This is a bit of a hack to show errors here. A global error state would be better.
+        {addError && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
             <span className="block sm:inline">{addError}</span>
           </div>
