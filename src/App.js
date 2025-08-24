@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown, Mail } from 'lucide-react'; // Added Mail icon
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 
@@ -8,6 +8,9 @@ import _ from 'lodash';
 const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
 // IMPORTANT: Base URL for admin operations on FastAPI
 const ADMIN_BACKEND_BASE_URL = "/api/admin";
+// IMPORTANT: Base URL for shareholder notification API
+const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
+
 
 // IMPORTANT: Replace with your WooCommerce Subscription Product URL
 const WOOCOMMERCE_SUBSCRIPTION_URL = "https://your-wordpress-site.com/product/your-subscription-product/";
@@ -1520,6 +1523,8 @@ const EquityManagementApp = () => {
 
   const [isPremiumUser, setIsPremiumUser] = useState(false);
 
+  const [selectedShareholdersForEmail, setSelectedShareholdersForEmail] = useState([]); // New state for selected shareholders
+
 
   const pieColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
 
@@ -2758,6 +2763,51 @@ const EquityManagementApp = () => {
     }
   };
 
+  // New function to send email notifications
+  const sendShareholderNotifications = async () => {
+    if (!selectedCompany) {
+      addError("Please select a company first.");
+      return;
+    }
+    if (selectedShareholdersForEmail.length === 0) {
+      addError("Please select at least one shareholder to notify.");
+      return;
+    }
+
+    setLoading(true);
+    setErrors([]);
+
+    try {
+      const payload = {
+        company_id: selectedCompany.id,
+        shareholder_ids: selectedShareholdersForEmail,
+      };
+
+      const response = await fetch(NOTIFICATION_BACKEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail || errorData.error}`);
+      }
+
+      const result = await response.json();
+      addError(result.message || 'Email notifications sent successfully!');
+      setSelectedShareholdersForEmail([]); // Clear selection after sending
+
+    } catch (error) {
+      console.error("Error sending shareholder notifications:", error);
+      addError('Failed to send email notifications: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   // Get both filtered and unfiltered data
   const companyDataExclOptions = getCompanyData(shareIssuances, true);
@@ -3002,6 +3052,7 @@ const EquityManagementApp = () => {
             { id: 'bulk-add', name: 'Bulk Add Shares', icon: Upload },
             { id: 'reports', name: 'Reports', icon: Download },
             { id: 'futureScenario', name: 'Future Scenario', icon: BarChart3 },
+            { id: 'notifications', name: 'Notifications', icon: Mail }, // New Notifications tab
           ].filter(Boolean).map(tab => (
             <button
               key={tab.id}
@@ -3050,6 +3101,9 @@ const EquityManagementApp = () => {
                 )}
                 {activeTab === 'futureScenario' && (
                   <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Future Scenario</h1>
+                )}
+                {activeTab === 'notifications' && (
+                  <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Notifications</h1>
                 )}
                 {activeTab === 'account' && (
                   <h1 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>My Account</h1>
@@ -3109,10 +3163,10 @@ const EquityManagementApp = () => {
         {/* Main Content Body */}
         <div className="flex-1 overflow-y-auto p-6">
           {errors.map((error) => (
-              <div key={error.id} className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center justify-between">
-                  <span>{error.message}</span>
-                  <button onClick={() => removeError(error.id)} className="ml-4 text-red-700 hover:text-red-900">
-                      <XCircle className="h-5 w-5" />
+                <div key={error.id} className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center justify-between">
+                    <span>{error.message}</span>
+                    <button onClick={() => removeError(error.id)} className="ml-4 text-red-700 hover:text-red-900">
+                        <XCircle className="h-5 w-5" />
                     </button>
                 </div>
             ))}
@@ -3648,6 +3702,53 @@ const EquityManagementApp = () => {
                       </div>
                     )}
                   </div>
+              )}
+              {activeTab === 'notifications' && ( // New Notifications tab content
+                <div className="space-y-6">
+                  <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Notify Shareholders</h2>
+                  <p className="text-sm" style={{ color: theme.lightText }}>
+                    Select shareholders to send them an email with a summary of their current shareholdings in the selected company.
+                  </p>
+                  {shareholders.length === 0 ? (
+                    <div className="bg-white p-4 rounded-lg shadow text-center text-gray-500">
+                      No shareholders found for this company. Add shareholders to enable notifications.
+                    </div>
+                  ) : (
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Select Shareholders</h3>
+                      <div className="space-y-3">
+                        {shareholders.map(shareholder => (
+                          <div key={shareholder.id} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              id={`shareholder-${shareholder.id}`}
+                              checked={selectedShareholdersForEmail.includes(shareholder.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedShareholdersForEmail([...selectedShareholdersForEmail, shareholder.id]);
+                                } else {
+                                  setSelectedShareholdersForEmail(selectedShareholdersForEmail.filter(id => id !== shareholder.id));
+                                }
+                              }}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <label htmlFor={`shareholder-${shareholder.id}`} className="ml-3 text-sm font-medium text-gray-700">
+                              {shareholder.name} ({shareholder.email || 'No Email'})
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={sendShareholderNotifications}
+                        className="mt-6 w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center"
+                        disabled={loading || selectedShareholdersForEmail.length === 0}
+                      >
+                        {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+                        Send Notification Email ({selectedShareholdersForEmail.length})
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               {activeTab === 'account' && (
                 <div className="space-y-6">
