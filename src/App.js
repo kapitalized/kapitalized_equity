@@ -2183,7 +2183,7 @@ const EquityManagementApp = () => {
                     <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholdings inc-Options (Fully Diluted)</h3>
                     <SortableTable
                       data={shareholderDataInclOptions}
-                      columns={shareholderTableColumnsExclOptions} {/* Now explicitly using the same layout */}
+                      columns={shareholderTableColumnsExclOptions} /* Now explicitly using the same layout */
                       entityType="shareholding" // Changed entityType to 'shareholding'
                       addError={addError}
                       onRowEdit={handleEditShareholder}
