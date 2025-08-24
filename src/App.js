@@ -1225,7 +1225,8 @@ const AdminApp = () => {
     // Replaced window.confirm with custom alert/modal for user experience.
     // For now, using a simple console log placeholder to illustrate the change.
     console.log(`Confirming deletion of ${type} with ID: ${id}`);
-    const confirmed = true; // Placeholder: In a real app, this would be a modal confirmation
+    // In a real app, this would be a modal confirmation, for now, we assume confirmed for admin.
+    const confirmed = window.confirm(`Are you sure you want to delete this ${type}? This cannot be undone.`);
 
     if (!confirmed) return; // If user cancels the confirmation
 
@@ -1249,6 +1250,13 @@ const AdminApp = () => {
     } finally {
       setLoadingAdminData(false);
     }
+  };
+
+  // Placeholder for admin edit functionality
+  const handleAdminEdit = (id, type) => {
+    console.log(`Admin editing ${type} with ID: ${id}`);
+    addError(`Admin edit functionality for ${type} is not yet implemented.`);
+    // In a real application, you would open a modal here to edit the data.
   };
 
   const userColumns = [
@@ -1277,12 +1285,14 @@ const AdminApp = () => {
     company.name.toLowerCase().includes(adminCompanySearchTerm.toLowerCase())
   );
 
+  // Filter issuances by selected company, or show all if no company is selected
   const displayedIssuances = adminSelectedCompany
     ? allIssuances.filter(issuance => issuance.company_id === adminSelectedCompany.id)
     : allIssuances;
 
-  const displayedShareholders = adminSelectedCompany
-    ? allUsers.filter(userItem => allCompanies.some(company => company.user_id === userItem.id && company.id === adminSelectedCompany.id))
+  // Filter users by selected company's owner, or show all users if no company is selected
+  const displayedUsers = adminSelectedCompany
+    ? allUsers.filter(userItem => userItem.id === adminSelectedCompany.user_id)
     : allUsers;
 
 
@@ -1331,7 +1341,8 @@ const AdminApp = () => {
         <div className="flex-1 overflow-y-auto p-6">
           {/* Admin-specific errors could be displayed here */}
 
-          {currentView !== 'users' && ( // Only show company selector if not on users view
+          {/* Company Filter for Issuances and Users (if applicable) */}
+          {(currentView === 'issuances' || currentView === 'users') && (
             <div className="mb-6 flex items-center space-x-4">
               <label htmlFor="admin-company-select" className="text-sm font-medium" style={{ color: theme.text }}>Filter by Company:</label>
               <select
@@ -1367,6 +1378,7 @@ const AdminApp = () => {
                 data={filteredAdminCompanies}
                 columns={companyColumns}
                 onRowDelete={handleAdminDelete}
+                onRowEdit={handleAdminEdit} // Added edit functionality
                 entityType="company"
                 addError={addError}
               />
@@ -1379,6 +1391,7 @@ const AdminApp = () => {
                 data={displayedIssuances}
                 columns={issuanceColumns}
                 onRowDelete={handleAdminDelete}
+                onRowEdit={handleAdminEdit} // Added edit functionality
                 entityType="issuance"
                 addError={addError}
               />
@@ -1386,11 +1399,12 @@ const AdminApp = () => {
           )}
           {currentView === 'users' && (
             <>
-              <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Users</h3>
+              <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Users {adminSelectedCompany ? `(Owner of ${adminSelectedCompany.name})` : ''}</h3>
               <SortableTable
-                data={allUsers}
+                data={displayedUsers}
                 columns={userColumns}
                 onRowDelete={handleAdminDelete}
+                onRowEdit={handleAdminEdit} // Added edit functionality
                 entityType="user"
                 addError={addError}
               />
