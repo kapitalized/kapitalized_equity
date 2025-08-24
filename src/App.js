@@ -1394,13 +1394,13 @@ const EquityManagementApp = () => {
       pdf.text('Company Overview', 10, y);
       y += 7;
       pdf.setFontSize(12);
-      pdf.text(`Total Shares Outstanding: ${companyData.totalShares.toLocaleString()}`, 10, y);
+      pdf.text(`Total Shares Outstanding: ${companyDataInclOptions.totalShares.toLocaleString()}`, 10, y);
       y += 7;
-      pdf.text(`Total Equity Value (Sum of issuances): $${companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 10, y);
+      pdf.text(`Total Equity Value (Sum of issuances): $${companyDataInclOptions.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 10, y);
       y += 7;
-      pdf.text(`Latest Valuation per Share: $${companyData.latestValuationPerShare.toFixed(2)}`, 10, y);
+      pdf.text(`Latest Valuation per Share: $${companyDataInclOptions.latestValuationPerShare.toFixed(2)}`, 10, y);
       y += 7;
-      pdf.text(`Company Valuation (Total Shares x Latest Price): $${companyData.companyValuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 10, y);
+      pdf.text(`Company Valuation (Total Shares x Latest Price): $${companyDataInclOptions.companyValuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 10, y);
       y += 15;
 
       if (pieChartRef.current && window.html2canvas) {
@@ -1423,7 +1423,7 @@ const EquityManagementApp = () => {
       pdf.setFontSize(14);
       pdf.text('Share Classes Summary', 10, y);
       y += 7;
-      const shareClassesTableData = companyData.classSummary.map(item => [
+      const shareClassesTableData = companyDataInclOptions.classSummary.map(item => [
         item.name,
         item.totalShares.toLocaleString(),
         `$${item.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
@@ -1447,7 +1447,7 @@ const EquityManagementApp = () => {
       pdf.setFontSize(14);
       pdf.text('Shareholders Details', 10, y);
       y += 7;
-      const shareholdersTableData = shareholderData.map(sh => [
+      const shareholdersTableData = shareholderDataInclOptions.map(sh => [
         sh.name,
         sh.email,
         sh.type,
@@ -1513,7 +1513,7 @@ const EquityManagementApp = () => {
   };
 
   const handleDownloadCsv = () => {
-    if (!selectedCompany || shareholderData.length === 0) {
+    if (!selectedCompany || shareholderDataInclOptions.length === 0) {
       addError("No shareholder data to download for CSV.");
       return;
     }
@@ -1525,7 +1525,7 @@ const EquityManagementApp = () => {
       const headers = ["Name", "Email", "Type", "Total Shares", "Total Value", "Holdings Details"];
       let csvContent = headers.join(",") + "\n";
 
-      shareholderData.forEach(sh => {
+      shareholderDataInclOptions.forEach(sh => {
         const holdingsString = sh.holdings.map(h =>
           `${h.shareClassName}: ${h.shares} @ $${h.price_per_share} (Round: ${h.round} - ${h.roundTitle || 'N/A'}) - Value: $${h.valuation}`
         ).join('; ');
@@ -1594,6 +1594,11 @@ const EquityManagementApp = () => {
   const companyDataInclOptions = getCompanyData(shareIssuances, false);
   const shareholderDataExclOptions = getShareholderData(shareIssuances, true);
   const shareholderDataInclOptions = getShareholderData(shareIssuances, false);
+
+  // Define displayEquityData and currentEquityData after companyDataExclOptions and companyDataInclOptions
+  const currentEquityData = getEquityDataForRound('current', false); // Default to including options for current view
+  const displayEquityData = selectedRound === 'current' ? currentEquityData : getEquityDataForRound(selectedRound, false); // Default to including options for historical view
+
 
   // Columns for Shareholder table (excl. Options/Convertible)
   const shareholderTableColumnsExclOptions = [
@@ -1971,14 +1976,20 @@ const EquityManagementApp = () => {
                   <p className="text-sm" style={{ color: theme.lightText }}>Manage your company's cap table and issuances.</p>
                 </div>
                 {/* Product Placeholder: Valuations */}
-                <div className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center" style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}>
+                <div
+                  className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center"
+                  style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}
+                >
                   <Download className="h-12 w-12 mb-3" style={{ color: theme.lightText }} />
                   <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Valuations</h3>
                   <p className="text-sm" style={{ color: theme.lightText }}>Analyze company valuations and financial models.</p>
                   <p className="mt-2 text-sm font-medium" style={{ color: theme.accent }}>Coming Soon</p>
                 </div>
                 {/* Product Placeholder: Dataroom */}
-                <div className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center" style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}>
+                <div
+                  className="p-6 rounded-lg shadow flex flex-col items-center justify-center text-center"
+                  style={{ backgroundColor: theme.cardBackground, minHeight: '180px', border: `1px solid ${theme.borderColor}` }}
+                >
                   <Upload className="h-12 w-12 mb-3" style={{ color: theme.lightText }} />
                   <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Dataroom</h3>
                   <p className="text-sm" style={{ color: theme.lightText }}>Securely share documents with investors and advisors.</p>
@@ -3393,7 +3404,7 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
 
       <div className="bg-white p-6 rounded-lg shadow">
         <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Account Actions</h3>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm" style={{ color: theme.lightText }}>
           Deactivate your account to free up your email for new sign-ups, or permanently delete your account and all associated company data.
         </p>
         <div className="flex space-x-4">
