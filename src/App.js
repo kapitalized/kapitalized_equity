@@ -608,7 +608,20 @@ const EquityManagementApp = () => {
         .select('*')
         .eq('company_id', companyId);
       if (shareIssuancesError) throw shareIssuancesError;
-      setShareIssuances(shareIssuancesData);
+
+      // --- ENHANCEMENT: Enrich shareIssuances with display names and calculated total_value ---
+      const enrichedIssuances = shareIssuancesData.map(issuance => {
+        const shareholder = shareholdersData.find(s => s.id === issuance.shareholder_id);
+        const shareClass = shareClassesData.find(sc => sc.id === issuance.share_class_id);
+        return {
+          ...issuance,
+          shareholder_name: shareholder?.name || 'Unknown',
+          share_class_name: shareClass?.name || 'Unknown',
+          total_value: issuance.shares * issuance.price_per_share, // Calculate total_value here
+        };
+      });
+      setShareIssuances(enrichedIssuances);
+      // --- END ENHANCEMENT ---
 
     } catch (error) {
       addError('Error fetching company data: ' + error.message);
@@ -1568,11 +1581,11 @@ const EquityManagementApp = () => {
   const issuanceTableColumns = [
     { key: 'issue_date', header: 'Date', isSortable: true },
     { key: 'round', header: 'Round', isSortable: true, render: (row) => `${row.round} (${row.round_description || 'N/A'})` },
-    { key: 'shareholder_name', header: 'Shareholder', isSortable: true, render: (row) => shareholders.find(s => s.id === row.shareholder_id)?.name || 'Unknown' },
-    { key: 'share_class_name', header: 'Share Class', isSortable: true, render: (row) => shareClasses.find(sc => sc.id === row.share_class_id)?.name || 'Unknown' },
+    { key: 'shareholder_name', header: 'Shareholder', isSortable: true }, // Now exists on row
+    { key: 'share_class_name', header: 'Share Class', isSortable: true }, // Now exists on row
     { key: 'shares', header: 'Shares', isSortable: true, isSummable: true, render: (row) => row.shares.toLocaleString() },
     { key: 'price_per_share', header: 'Price/Share', isSortable: true, render: (row) => `$${row.price_per_share.toFixed(2)}` },
-    { key: 'total_value', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${(row.shares * row.price_per_share).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+    { key: 'total_value', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.total_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` }, // Now exists on row
   ];
 
   // Columns for Share Classes table (in Equity Home)
