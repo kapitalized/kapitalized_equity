@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
-// import { createClient } from '@supabase/supabase-js'; // Removed direct import
 
 // Date stamp for the last update to this file: 202508241730
 // IMPORTANT: URL for the main equity calculation FastAPI endpoint
@@ -29,7 +28,21 @@ const theme = {
 const supabaseUrl = "https://hrlqnbzcjcmrpjwnoiby.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE";
 
-let supabase = null; // Initialize as null, will be set in useEffect
+// Initialize Supabase client globally once, ensuring window.supabase is available
+let supabaseClient = null;
+if (typeof window !== 'undefined' && window.supabase) {
+  try {
+    supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    // Make the initialized client instance available on the window object for all components
+    window.supabaseClient = supabaseClient;
+    console.log("Supabase client initialized globally.");
+  } catch (e) {
+    console.error("Failed to initialize Supabase client globally: " + e.message);
+  }
+} else {
+  console.warn("Supabase library (window.supabase) not loaded or window is undefined. Cannot initialize client globally.");
+}
+
 
 // --- Data for Address Dropdowns ---
 const countryData = {
@@ -1130,42 +1143,45 @@ const AdminApp = () => {
   };
 
   useEffect(() => {
-    // Check admin authentication on mount
     const initAdminAuth = async () => {
-      if (typeof window.supabase === 'undefined') {
-        // Supabase not yet loaded, wait for it
+      // Wait for the global supabaseClient to be available
+      const checkSupabaseReady = () => {
+        return typeof window.supabaseClient !== 'undefined' && window.supabaseClient !== null;
+      };
+
+      if (!checkSupabaseReady()) {
         const interval = setInterval(() => {
-          if (typeof window.supabase !== 'undefined') {
+          if (checkSupabaseReady()) {
             clearInterval(interval);
             checkAdminAuth();
           }
-        }, 100); // Poll every 100ms
+        }, 100);
         return;
       }
       checkAdminAuth();
     };
 
     const checkAdminAuth = async () => {
-      if (!window.supabase) {
-        addError("Supabase client not initialized.");
+      if (!window.supabaseClient) { // Use the globally available client instance
+        addError("Supabase client not initialized for AdminApp.");
         return;
       }
-      const { data: { session }, error } = await window.supabase.auth.getSession();
+      const { data: { session }, error } = await window.supabaseClient.auth.getSession(); // Use the globally available client instance
 
       if (error || !session) {
-        window.location.href = '/adminhq/login'; // Redirect to admin login if no session
+        window.location.href = '/adminhq/login';
         return;
       }
 
-      const { data: userProfile, error: profileError } = await window.supabase
+      const { data: userProfile, error: profileError } = await window.supabaseClient // Use the globally available client instance
         .from('user_profiles')
         .select('is_admin')
         .eq('id', session.user.id)
         .single();
 
       if (profileError || !userProfile?.is_admin) {
-        await window.supabase.auth.signOut();
-        window.location.href = '/adminhq/login'; // Redirect if not admin
+        await window.supabaseClient.auth.signOut(); // Use the globally available client instance
+        window.location.href = '/adminhq/login';
         return;
       }
       setAdminUser(session.user);
@@ -1173,7 +1189,7 @@ const AdminApp = () => {
     };
 
     initAdminAuth();
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount
 
 
   const fetchAllAdminData = async () => {
@@ -1296,7 +1312,7 @@ const AdminApp = () => {
           <button onClick={() => setCurrentView('users')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'users' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Users className="h-5 w-5 mr-3" /> All Users
           </button>
-          <button onClick={async () => { await window.supabase.auth.signOut(); window.location.href = '/adminhq/login'; }} className="w-full flex items-center p-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 mt-4">
+          <button onClick={async () => { await window.supabaseClient.auth.signOut(); window.location.href = '/adminhq/login'; }} className="w-full flex items-center p-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 mt-4">
             <LogOut className="h-5 w-5 mr-3" /> Logout
           </button>
         </nav>
@@ -1455,27 +1471,15 @@ const EquityManagementApp = () => {
     setErrors((prevErrors) => prevErrors.filter((error) => error.id !== id));
   };
 
-  // Supabase client initialization moved to useEffect
   useEffect(() => {
-    // Only initialize Supabase once
-    if (typeof window !== 'undefined' && !supabase) {
-      try {
-        supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-        console.log("Supabase client initialized.");
-      } catch (e) {
-        addError("Failed to initialize Supabase client: " + e.message);
-        setLoading(false);
-        return;
-      }
-    }
-
-    if (!supabase) {
-      addError("Supabase client not initialized.");
+    // Use the globally initialized supabaseClient
+    if (!window.supabaseClient) {
+      addError("Supabase client not initialized for EquityManagementApp.");
       setLoading(false);
       return;
     }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    const { data: authListener } = window.supabaseClient.auth.onAuthStateChange(
       async (event, session) => {
         const currentUser = session?.user || null;
         setUser(currentUser);
@@ -1498,7 +1502,7 @@ const EquityManagementApp = () => {
     );
 
     // Initial check for session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    window.supabaseClient.auth.getSession().then(({ data: { session }, error }) => {
         if (error) {
             addError("Error checking initial session: " + error.message);
             setLoading(false);
@@ -1522,7 +1526,7 @@ const EquityManagementApp = () => {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, []);
+  }, []); // Empty dependency array, as supabaseClient is now globally available
 
   useEffect(() => {
     if (userProfile && userProfile.subscription_status === 'active') {
@@ -1552,12 +1556,12 @@ const EquityManagementApp = () => {
     setErrors([]);
     setSignUpSuccessMessage('');
     setLoading(true);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       addError("Supabase client not initialized.");
       setLoading(false);
       return;
     }
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await window.supabaseClient.auth.signInWithPassword({
       email: loginData.email,
       password: loginData.password,
     });
@@ -1572,7 +1576,7 @@ const EquityManagementApp = () => {
     setErrors([]);
     setSignUpSuccessMessage('');
     setLoading(true);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       addError("Supabase client not initialized.");
       setLoading(false);
       return;
@@ -1580,7 +1584,7 @@ const EquityManagementApp = () => {
     try {
       const generatedUsername = signUpData.username || `user_${Math.random().toString(36).substring(2, 9)}`;
 
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await window.supabaseClient.auth.signUp({
         email: signUpData.email,
         password: signUpData.password,
         options: {
@@ -1613,12 +1617,12 @@ const EquityManagementApp = () => {
   const handleLogout = async () => {
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       addError("Supabase client not initialized.");
       setLoading(false);
       return;
     }
-    const { error } = await supabase.auth.signOut();
+    const { error } = await window.supabaseClient.auth.signOut();
     setLoading(false);
     if (error) {
       addError(error.message);
@@ -1628,12 +1632,12 @@ const EquityManagementApp = () => {
   const fetchInitialData = async (userId) => {
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { data: companiesData, error: companiesError } = await supabase
+      const { data: companiesData, error: companiesError } = await window.supabaseClient
         .from('companies')
         .select('*')
         .eq('user_id', userId);
@@ -1660,26 +1664,26 @@ const EquityManagementApp = () => {
     if (!companyId) return;
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { data: shareholdersData, error: shareholdersError } = await supabase
+      const { data: shareholdersData, error: shareholdersError } = await window.supabaseClient
         .from('shareholders')
         .select('*')
         .eq('company_id', companyId);
       if (shareholdersError) throw shareholdersError;
       setShareholders(shareholdersData);
 
-      const { data: shareClassesData, error: shareClassesError } = await supabase
+      const { data: shareClassesData, error: shareClassesError } = await window.supabaseClient
         .from('share_classes')
         .select('*')
         .eq('company_id', companyId);
       if (shareClassesError) throw shareClassesError;
       setShareClasses(shareClassesData);
 
-      const { data: shareIssuancesData, error: shareIssuancesError } = await supabase
+      const { data: shareIssuancesData, error: shareIssuancesError } = await window.supabaseClient
         .from('share_issuances')
         .select('*')
         .eq('company_id', companyId);
@@ -1710,15 +1714,15 @@ const EquityManagementApp = () => {
     if (selectedCompany) {
       fetchCompanyRelatedData(selectedCompany.id);
     }
-  }, [selectedCompany, supabase]); // Added supabase to dependencies
+  }, [selectedCompany, window.supabaseClient]); // Changed dependency to window.supabaseClient
 
   const fetchUserProfile = async (userId) => {
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       return;
     }
     try {
-      const { data, error } = await supabase
+      const { data, error } = await window.supabaseClient
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
@@ -1741,13 +1745,13 @@ const EquityManagementApp = () => {
     }
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
       if (profileData.username && profileData.username !== userProfile?.username) {
-        const { data: existingUser, error: checkError } = await supabase
+        const { data: existingUser, error: checkError } = await window.supabaseClient
           .from('user_profiles')
           .select('id')
           .eq('username', profileData.username)
@@ -1769,7 +1773,7 @@ const EquityManagementApp = () => {
         address: profileData.address,
         username: profileData.username,
       };
-      const { data, error } = await supabase
+      const { data, error } = await window.supabaseClient
         .from('user_profiles')
         .upsert({ id: user.id, ...dataToUpdate }, { onConflict: 'id' });
 
@@ -1786,12 +1790,12 @@ const EquityManagementApp = () => {
   const updatePassword = async (newPassword) => {
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { error } = await window.supabaseClient.auth.updateUser({
         password: newPassword,
       });
       if (error) throw error;
@@ -1806,14 +1810,14 @@ const EquityManagementApp = () => {
   const updateEmail = async (newEmail) => {
     setLoading(true);
     setErrors([]);
-    if (!supabase || !user) {
+    if (!window.supabaseClient || !user) {
       addError("Supabase client or user not initialized.");
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+      const { data, error } = await window.supabaseClient.auth.updateUser({ email: newEmail });
 
       if (error) throw error;
       
@@ -1831,14 +1835,14 @@ const EquityManagementApp = () => {
   const handleDeleteAccount = async () => {
     setLoading(true);
     setErrors([]);
-    if (!supabase || !user) {
+    if (!window.supabaseClient || !user) {
       addError("Supabase client or user not initialized.");
       setLoading(false);
       return;
     }
 
     try {
-      const { error: deleteCompaniesError } = await supabase
+      const { error: deleteCompaniesError } = await window.supabaseClient
         .from('companies')
         .delete()
         .eq('user_id', user.id);
@@ -1846,7 +1850,7 @@ const EquityManagementApp = () => {
       if (deleteCompaniesError) throw deleteCompaniesError;
       console.log('User companies and related data deleted.');
 
-      const { error: deleteProfileError } = await supabase
+      const { error: deleteProfileError } = await window.supabaseClient
         .from('user_profiles')
         .delete()
         .eq('id', user.id);
@@ -1858,7 +1862,7 @@ const EquityManagementApp = () => {
       }
       console.log('User profile deleted or not found (expected).');
 
-      const { error: signOutError } = await supabase.auth.signOut();
+      const { error: signOutError } = await window.supabaseClient.auth.signOut();
       if (signOutError) throw signOutError;
 
       addError('Your account and all associated data in companies, shareholders, share classes, and share issuances have been deleted. You have been logged out.');
@@ -1880,7 +1884,7 @@ const EquityManagementApp = () => {
   };
 
   const handleDeactivateAccount = async () => {
-    if (!user || !supabase) {
+    if (!user || !window.supabaseClient) {
         addError("User not logged in or Supabase client not initialized.");
         return;
     }
@@ -1894,7 +1898,7 @@ const EquityManagementApp = () => {
         const cleanLocalPart = localPart.split('+')[0];
         const newEmail = `${cleanLocalPart}+inactive-${timestamp}@${domain}`;
 
-        const { data: authUpdateData, error: authUpdateError } = await supabase.auth.updateUser({
+        const { data: authUpdateData, error: authUpdateError } = await window.supabaseClient.auth.updateUser({
             email: newEmail,
         });
 
@@ -1902,7 +1906,7 @@ const EquityManagementApp = () => {
 
         console.log('User email updated to inactive:', newEmail);
 
-        const { error: profileUpdateError } = await supabase
+        const { error: profileUpdateError } = await window.supabaseClient
             .from('user_profiles')
             .update({ status: 'inactive' })
             .eq('id', user.id);
@@ -1910,7 +1914,7 @@ const EquityManagementApp = () => {
         if (profileUpdateError) throw profileUpdateError;
         console.log('User profile status set to inactive.');
 
-        const { error: signOutError } = await supabase.auth.signOut();
+        const { error: signOutError } = await window.supabaseClient.auth.signOut();
         if (signOutError) throw signOutError;
 
         addError('Your account has been deactivated and you have been logged out. You can now create a new account with your original email.');
@@ -1934,12 +1938,12 @@ const EquityManagementApp = () => {
     if (!user) return;
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { data: newCompany, error: companyError } = await supabase
+      const { data: newCompany, error: companyError } = await window.supabaseClient
         .from('companies')
         .insert({
           name: data.name,
@@ -1969,7 +1973,7 @@ const EquityManagementApp = () => {
         company_id: newCompany.id
       }));
 
-      const { error: shareClassError } = await supabase
+      const { error: shareClassError } = await window.supabaseClient
         .from('share_classes')
         .insert(shareClassesToInsert);
 
@@ -1991,12 +1995,12 @@ const EquityManagementApp = () => {
     if (!user) return; // User must be logged in
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { error } = await supabase
+      const { error } = await window.supabaseClient
         .from('companies')
         .update({
           name: data.name,
@@ -2030,7 +2034,7 @@ const EquityManagementApp = () => {
 
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
@@ -2074,12 +2078,12 @@ const EquityManagementApp = () => {
     if (!selectedCompany) return;
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { data: newShareholder, error } = await supabase
+      const { data: newShareholder, error } = await window.supabaseClient
         .from('shareholders')
         .insert({
           company_id: selectedCompany.id,
@@ -2106,12 +2110,12 @@ const EquityManagementApp = () => {
     if (!user || !selectedCompany) return;
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { error } = await supabase
+      const { error } = await window.supabaseClient
         .from('shareholders')
         .update({
           name: data.name,
@@ -2150,12 +2154,12 @@ const EquityManagementApp = () => {
     if (!selectedCompany) return;
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { data: newShareClass, error } = await supabase
+      const { data: newShareClass, error } = await window.supabaseClient
         .from('share_classes')
         .insert({
           company_id: selectedCompany.id,
@@ -2180,12 +2184,12 @@ const EquityManagementApp = () => {
     if (!selectedCompany) return;
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { data: newIssuance, error } = await supabase
+      const { data: newIssuance, error } = await window.supabaseClient
         .from('share_issuances')
         .insert({
           company_id: selectedCompany.id,
@@ -2215,12 +2219,12 @@ const EquityManagementApp = () => {
   const deleteIssuance = async (id) => {
     setLoading(true);
     setErrors([]);
-    if (!supabase) {
+    if (!window.supabaseClient) {
       setLoading(false);
       return;
     }
     try {
-      const { error } = await supabase
+      const { error } = await window.supabaseClient
         .from('share_issuances')
         .delete()
         .eq('id', id);
@@ -3780,13 +3784,13 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoginError('');
     setLoadingLogin(true);
-    if (!window.supabase) {
+    if (!window.supabaseClient) { // Use global instance
       setLoginError("Supabase client not initialized.");
       setLoadingLogin(false);
       return;
     }
     try {
-      const { data, error } = await window.supabase.auth.signInWithPassword({
+      const { data, error } = await window.supabaseClient.auth.signInWithPassword({ // Use global instance
         email: loginData.email,
         password: loginData.password,
       });
@@ -3794,14 +3798,14 @@ const AdminLogin = () => {
       if (error) throw error;
 
       // Check if the logged-in user is an admin
-      const { data: userProfile, error: profileError } = await window.supabase
+      const { data: userProfile, error: profileError } = await window.supabaseClient // Use global instance
         .from('user_profiles')
         .select('is_admin')
         .eq('id', data.user.id)
         .single();
 
       if (profileError || !userProfile?.is_admin) {
-        await window.supabase.auth.signOut(); // Log out non-admin users
+        await window.supabaseClient.auth.signOut(); // Log out non-admin users // Use global instance
         setLoginError('You do not have admin privileges.');
         return;
       }
