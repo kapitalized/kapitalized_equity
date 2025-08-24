@@ -3,4 +3,4 @@ pandas
 fastapi
 uvicorn[standard]
 pydantic
-pip install sib-api-v3-sdk
+sib-api-v3-sdk
