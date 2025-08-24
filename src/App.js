@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart
 import _ from 'lodash';
 // import { createClient } from '@supabase/supabase-js'; // Removed direct import
 
-// Date stamp for the last update to this file: 202508241700
+// Date stamp for the last update to this file: 202508241730
 // IMPORTANT: URL for the main equity calculation FastAPI endpoint
 const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
 // IMPORTANT: Base URL for admin operations on FastAPI
@@ -61,7 +61,7 @@ const SHAREHOLDER_TYPES = [
 // Share types to exclude from 'ex-Options' calculations
 const EXCLUDED_SHARE_TYPES = ['Convertible', 'Options'];
 
-// --- Reusable Components (Moved to top level for global access) ---
+// --- Reusable Components (Defined at top level for global access) ---
 
 // Modal Component
 const Modal = ({ children, onClose }) => (
@@ -924,7 +924,8 @@ const SubscriptionPage = ({ userProfile, handleCheckout, loading, addError }) =>
 
 // New CompaniesPage Component
 const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError, setShowCreateCompany }) => {
-  const companyTableColumns = [
+  // Columns for Companies table (new)
+  const companiesTableColumns = [
     { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
     { key: 'description', header: 'Description', isSortable: true },
     { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || ''}, ${row.address.state}, ${row.address.country}` : 'N/A' },
@@ -1231,10 +1232,10 @@ const AdminApp = () => {
           <button onClick={() => setCurrentView('companies')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'companies' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Building2 className="h-5 w-5 mr-3" /> All Companies
           </button>
-          <button onClick={() => setCurrentView('issuances')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'issuances' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+          <button onClick={() => setCurrentView('issuances')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'issuances' ? 'bg-blue-100 text-blue-700' : 'bg-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <PlusCircle className="h-5 w-5 mr-3" /> All Issuances
           </button>
-          <button onClick={() => setCurrentView('users')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'users' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+          <button onClick={() => setCurrentView('users')} className={`w-full flex items-center p-2 rounded-md text-sm font-medium ${currentView === 'users' ? 'bg-blue-100 text-blue-700' : 'bg-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
             <Users className="h-5 w-5 mr-3" /> All Users
           </button>
           <button onClick={async () => { await window.supabase.auth.signOut(); window.location.href = '/adminhq/login'; }} className="w-full flex items-center p-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 mt-4">
@@ -1254,6 +1255,8 @@ const AdminApp = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Admin-specific errors could be displayed here */}
+
           {currentView !== 'users' && ( // Only show company selector if not on users view
             <div className="mb-6 flex items-center space-x-4">
               <label htmlFor="admin-company-select" className="text-sm font-medium" style={{ color: theme.text }}>Filter by Company:</label>
