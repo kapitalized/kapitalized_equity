@@ -377,6 +377,7 @@ const EquityManagementApp = () => {
   });
   const [futureScenarioResults, setFutureScenarioResults] = useState(null);
   const [selectedRound, setSelectedRound] = useState('current');
+  const [reportSubTab, setReportSubTab] = useState('currentEquityExclOptions'); // New state for reports sub-tabs
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [myAccountSubTab, setMyAccountSubTab] = useState('profile');
@@ -808,7 +809,7 @@ const EquityManagementApp = () => {
             email: newEmail,
         });
 
-        if (authUpdateError) throw authUpdateError;
+        if (authUpdateData) throw authUpdateError;
         console.log('User email updated to inactive:', newEmail);
 
         const { error: profileUpdateError } = await supabase
@@ -1147,6 +1148,15 @@ const EquityManagementApp = () => {
       const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
       if (!shareClass) return true; // Include if share class not found (shouldn't happen)
       return excludeOptionsAndConvertible ? !EXCLUDED_SHARE_TYPES.includes(shareClass.name) : true;
+    });
+  };
+
+  // Helper function to filter issuances to *only* include excluded share types
+  const filterIssuancesOnlyExcludedShareTypes = (issuancesToFilter) => {
+    if (!shareClasses.length) return [];
+    return issuancesToFilter.filter(issuance => {
+      const shareClass = shareClasses.find(sc => sc.id === issuance.share_class_id);
+      return shareClass && EXCLUDED_SHARE_TYPES.includes(shareClass.name);
     });
   };
 
@@ -1596,8 +1606,11 @@ const EquityManagementApp = () => {
   const shareholderDataInclOptions = getShareholderData(shareIssuances, false);
 
   // Define displayEquityData and currentEquityData after companyDataExclOptions and companyDataInclOptions
-  const currentEquityData = getEquityDataForRound('current', false); // Default to including options for current view
-  const displayEquityData = selectedRound === 'current' ? currentEquityData : getEquityDataForRound(selectedRound, false); // Default to including options for historical view
+  // These are now correctly defined within the component scope.
+  const currentEquityDataExclOptions = getEquityDataForRound('current', true); // Current view excluding options
+  const currentEquityDataInclOptions = getEquityDataForRound('current', false); // Current view including options
+  const displayEquityDataExclOptions = selectedRound === 'current' ? currentEquityDataExclOptions : getEquityDataForRound(selectedRound, true);
+  const displayEquityDataInclOptions = selectedRound === 'current' ? currentEquityDataInclOptions : getEquityDataForRound(selectedRound, false);
 
 
   // Columns for Shareholder table (excl. Options/Convertible)
@@ -1609,32 +1622,26 @@ const EquityManagementApp = () => {
     { key: 'totalValue', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
   ];
 
-  // Columns for Shareholder table (incl. Options/Convertible - Fully Diluted)
-  const shareholderTableColumnsInclOptions = [
-    { key: 'name', header: 'Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
-    { key: 'email', header: 'Email', isSortable: true },
-    { key: 'type', header: 'Type', isSortable: true },
-    { key: 'totalShares', header: 'Total Shares', isSortable: true, isSummable: true, render: (row) => row.totalShares.toLocaleString() },
-    { key: 'totalValue', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
-    { key: 'holdings', header: 'Holdings Details', isSortable: false, render: (row) => (
-        row.holdings.map((holding, idx) => (
-            <div key={idx} className="mb-1">
-                {holding.shareClassName}: {holding.shares.toLocaleString()} shares @ ${holding.price_per_share.toFixed(2)}/share (Round: {holding.round} - {holding.roundTitle || 'N/A'}) - Value: ${holding.valuation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-            </div>
-        ))
-      )
-    },
-  ];
-
-  // Columns for Issuances table
-  const issuanceTableColumns = [
+  // Columns for Issuances table (excl. Options/Convertible)
+  const issuanceTableColumnsExclOptions = [
     { key: 'issue_date', header: 'Date', isSortable: true },
     { key: 'round', header: 'Round', isSortable: true, render: (row) => `${row.round} (${row.round_description || 'N/A'})` },
-    { key: 'shareholder_name', header: 'Shareholder', isSortable: true }, // Now exists on row
-    { key: 'share_class_name', header: 'Share Class', isSortable: true }, // Now exists on row
+    { key: 'shareholder_name', header: 'Shareholder', isSortable: true },
+    { key: 'share_class_name', header: 'Share Class', isSortable: true },
     { key: 'shares', header: 'Shares', isSortable: true, isSummable: true, render: (row) => row.shares.toLocaleString() },
     { key: 'price_per_share', header: 'Price/Share', isSortable: true, render: (row) => `$${row.price_per_share.toFixed(2)}` },
-    { key: 'total_value', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.total_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` }, // Now exists on row
+    { key: 'total_value', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.total_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+  ];
+
+  // Columns for Issuances table (only Options/Convertible)
+  const issuanceTableColumnsInclOptions = [
+    { key: 'issue_date', header: 'Date', isSortable: true },
+    { key: 'round', header: 'Round', isSortable: true, render: (row) => `${row.round} (${row.round_description || 'N/A'})` },
+    { key: 'shareholder_name', header: 'Shareholder', isSortable: true },
+    { key: 'share_class_name', header: 'Share Class', isSortable: true },
+    { key: 'shares', header: 'Shares', isSortable: true, isSummable: true, render: (row) => row.shares.toLocaleString() },
+    { key: 'price_per_share', header: 'Price/Share', isSortable: true, render: (row) => `$${row.price_per_share.toFixed(2)}` },
+    { key: 'total_value', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.total_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
   ];
 
   // Columns for Share Classes table (in Equity Home)
@@ -2158,26 +2165,26 @@ const EquityManagementApp = () => {
                     </div>
                   </div>
 
-                  {/* Table: Shares Issued ex-Options */}
+                  {/* Table: Shareholdings ex-Options */}
                   <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shares Issued ex-Options</h3>
+                    <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholdings ex-Options</h3>
                     <SortableTable
                       data={shareholderDataExclOptions}
                       columns={shareholderTableColumnsExclOptions}
-                      entityType="shareholder"
+                      entityType="shareholding" // Changed entityType to 'shareholding'
                       addError={addError}
                       onRowEdit={handleEditShareholder}
                       onRowDelete={() => { /* Implement if needed */ }}
                     />
                   </div>
 
-                  {/* Table: Shares Issued inc-Options (Fully Diluted) */}
+                  {/* Table: Shareholdings inc-Options (Fully Diluted) */}
                   <div className="bg-white shadow rounded-lg p-6">
-                    <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shares Issued inc-Options (Fully Diluted)</h3>
+                    <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholdings inc-Options (Fully Diluted)</h3>
                     <SortableTable
                       data={shareholderDataInclOptions}
-                      columns={shareholderTableColumnsInclOptions}
-                      entityType="shareholder"
+                      columns={shareholderTableColumnsExclOptions} {/* Now explicitly using the same layout */}
+                      entityType="shareholding" // Changed entityType to 'shareholding'
                       addError={addError}
                       onRowEdit={handleEditShareholder}
                       onRowDelete={() => { /* Implement if needed */ }}
@@ -2199,13 +2206,30 @@ const EquityManagementApp = () => {
                       New Issuance
                     </button>
                   </div>
-                  <SortableTable
-                    data={shareIssuances.filter(issuance => issuance.company_id === selectedCompany.id)}
-                    columns={issuanceTableColumns}
-                    onRowDelete={deleteIssuance}
-                    entityType="issuance"
-                    addError={addError}
-                  />
+
+                  {/* Table: Shares Issued ex-Options */}
+                  <div className="bg-white shadow rounded-lg p-6">
+                    <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shares Issued ex-Options</h3>
+                    <SortableTable
+                      data={filterIssuancesByShareType(shareIssuances.filter(issuance => issuance.company_id === selectedCompany.id), true)}
+                      columns={issuanceTableColumnsExclOptions} // Use specific columns for ex-Options
+                      onRowDelete={deleteIssuance}
+                      entityType="issuance"
+                      addError={addError}
+                    />
+                  </div>
+
+                  {/* Table: Convertible and Options Shares */}
+                  <div className="bg-white shadow rounded-lg p-6">
+                    <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Convertible and Options Shares</h3>
+                    <SortableTable
+                      data={filterIssuancesOnlyExcludedShareTypes(shareIssuances.filter(issuance => issuance.company_id === selectedCompany.id))}
+                      columns={issuanceTableColumnsInclOptions} // Use specific columns for incl-Options
+                      onRowDelete={deleteIssuance}
+                      entityType="issuance"
+                      addError={addError}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -2244,94 +2268,89 @@ const EquityManagementApp = () => {
                 <div className="space-y-6">
                   <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Reports & Scenarios</h2>
 
-                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Equity Status (ex-Options)</h3>
-                    <p className="text-sm" style={{ color: theme.lightText }}>
-                      View the current equity distribution and valuation, excluding Convertible and Options share types.
-                    </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <button
-                      onClick={() => setSelectedRound('current')}
-                      className={`px-4 py-2 rounded-md flex items-center ${selectedRound === 'current' ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                      style={{ backgroundColor: selectedRound === 'current' ? theme.primary : theme.background }}
+                      onClick={() => setReportSubTab('currentEquityExclOptions')}
+                      className={`p-4 rounded-lg shadow text-left ${reportSubTab === 'currentEquityExclOptions' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                     >
-                      Show Current Status
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Current Equity Status (ex-Options)</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>View current equity excluding Convertible/Options.</p>
                     </button>
-                    {selectedRound === 'current' && (
-                      <div className="mt-4">
-                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Company Overview:</h4>
-                        <p style={{ color: theme.lightText }}>Total Shares: {companyDataExclOptions.totalShares.toLocaleString()}</p>
-                        <p style={{ color: theme.lightText }}>Total Value: ${companyDataExclOptions.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Shareholder Holdings:</h4>
-                        <SortableTable
-                          data={shareholderDataExclOptions}
-                          columns={reportShareholderHoldingsColumnsExclOptions}
-                          entityType="shareholder"
-                          addError={addError}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Historical Rounds Analysis (Fully Diluted)</h3>
-                    <p className="text-sm" style={{ color: theme.lightText }}>
-                      Analyze equity distribution and valuation at specific past issuance rounds, including Convertible and Options share types.
-                    </p>
-                    <select
-                      value={selectedRound}
-                      onChange={(e) => setSelectedRound(e.target.value)}
-                      className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 mb-4"
-                      style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
+                    <button
+                      onClick={() => setReportSubTab('historicalRoundsInclOptions')}
+                      className={`p-4 rounded-lg shadow text-left ${reportSubTab === 'historicalRoundsInclOptions' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                     >
-                      <option value="current">Select a Round...</option>
-                      {uniqueRounds.map(round => (
-                        <option key={round.round} value={round.round}>{round.round} ({round.roundTitle || 'N/A'})</option>
-                      ))}
-                    </select>
-                    {selectedRound !== 'current' && selectedRound !== '' && (
-                      <div className="mt-4">
-                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Status at Round {displayEquityData.companyData.classSummary[0]?.round} ({displayEquityData.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
-                        <p style={{ color: theme.lightText }}>Total Shares: {displayEquityData.companyData.totalShares.toLocaleString()}</p>
-                        <p style={{ color: theme.lightText }}>Total Value: ${displayEquityData.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                        <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Holdings at Round {displayEquityData.companyData.classSummary[0]?.round} ({displayEquityData.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
-                        <SortableTable
-                          data={displayEquityData.shareholderData}
-                          columns={reportShareholderHoldingsColumnsInclOptions} // Use inclOptions for historical rounds
-                          entityType="shareholder"
-                          addError={addError}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Company Profile Report (PDF)</h3>
-                    <p className="text-sm" style={{ color: theme.lightText }}>
-                      Generate a detailed PDF report of the selected company's equity profile, including summaries, charts, shareholders, and issuances.
-                    </p>
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Historical Rounds (Fully Diluted)</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>Analyze historical rounds including Convertible/Options.</p>
+                    </button>
                     <button
                       onClick={handleDownloadPdf}
-                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                      style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
+                      className="p-4 rounded-lg shadow text-left bg-white text-gray-700 hover:bg-gray-50"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Company Profile PDF
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Download Company Profile (PDF)</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>Generate a detailed PDF report.</p>
                     </button>
-                  </div>
-                  <div className="bg-white p-6 rounded-lg shadow" style={{ backgroundColor: theme.cardBackground }}>
-                    <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholders Data (CSV)</h3>
-                    <p className="text-sm" style={{ color: theme.lightText }}>
-                      Download a CSV file containing all shareholder details for the selected company.
-                    </p>
                     <button
                       onClick={handleDownloadCsv}
-                      className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
-                      style={{ backgroundColor: theme.secondary, color: theme.cardBackground }}
+                      className="p-4 rounded-lg shadow text-left bg-white text-gray-700 hover:bg-gray-50"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Shareholders CSV
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Download Shareholders (CSV)</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>Export shareholder data to CSV.</p>
                     </button>
                   </div>
+
+                  {reportSubTab === 'currentEquityExclOptions' && (
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Equity Status (ex-Options)</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>
+                        View the current equity distribution and valuation, excluding Convertible and Options share types.
+                      </p>
+                      <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Company Overview:</h4>
+                      <p style={{ color: theme.lightText }}>Total Shares: {companyDataExclOptions.totalShares.toLocaleString()}</p>
+                      <p style={{ color: theme.lightText }}>Total Value: ${companyDataExclOptions.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                      <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Current Shareholder Holdings:</h4>
+                      <SortableTable
+                        data={shareholderDataExclOptions}
+                        columns={reportShareholderHoldingsColumnsExclOptions}
+                        entityType="shareholder"
+                        addError={addError}
+                      />
+                    </div>
+                  )}
+
+                  {reportSubTab === 'historicalRoundsInclOptions' && (
+                    <div className="bg-white p-6 rounded-lg shadow">
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Historical Rounds Analysis (Fully Diluted)</h3>
+                      <p className="text-sm" style={{ color: theme.lightText }}>
+                        Analyze equity distribution and valuation at specific past issuance rounds, including Convertible and Options share types.
+                      </p>
+                      <select
+                        value={selectedRound}
+                        onChange={(e) => setSelectedRound(e.target.value)}
+                        className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2 mb-4"
+                        style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
+                      >
+                        <option value="current">Select a Round...</option>
+                        {uniqueRounds.map(round => (
+                          <option key={round.round} value={round.round}>{round.round} ({round.roundTitle || 'N/A'})</option>
+                        ))}
+                      </select>
+                      {selectedRound !== 'current' && selectedRound !== '' && (
+                        <div className="mt-4">
+                          <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Equity Status at Round {displayEquityDataInclOptions.companyData.classSummary[0]?.round} ({displayEquityDataInclOptions.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
+                          <p style={{ color: theme.lightText }}>Total Shares: {displayEquityDataInclOptions.companyData.totalShares.toLocaleString()}</p>
+                          <p style={{ color: theme.lightText }}>Total Value: ${displayEquityDataInclOptions.companyData.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                          <h4 className="font-bold mt-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shareholder Holdings at Round {displayEquityDataInclOptions.companyData.classSummary[0]?.round} ({displayEquityDataInclOptions.companyData.classSummary[0]?.roundTitle || 'N/A'}):</h4>
+                          <SortableTable
+                            data={displayEquityDataInclOptions.shareholderData}
+                            columns={reportShareholderHoldingsColumnsInclOptions} // Use inclOptions for historical rounds
+                            entityType="shareholder"
+                            addError={addError}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
                {activeTab === 'futureScenario' && (
