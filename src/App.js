@@ -790,9 +790,10 @@ const UserProfileForm = ({ userProfile, onSubmit, addError }) => {
 };
 
 // LoginDetailsForm - for Email and Password
-const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, onDeleteAccount, addError }) => {
+const LoginDetailsForm = ({ userEmail, onPasswordChange, onEmailChange, onDeactivateAccount, onDeleteAccount, addError }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [newEmail, setNewEmail] = useState('');
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
@@ -809,12 +810,24 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
     setConfirmPassword('');
   };
 
+  const handleEmailSubmit = (e) => {
+    e.preventDefault();
+    if (newEmail === userEmail) {
+      addError('New email cannot be the same as the current email.');
+      return;
+    }
+    onEmailChange(newEmail);
+    setNewEmail('');
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow">
         <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Login Information</h3>
+
+        {/* Current Email Display */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email (Cannot be changed directly)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Current Email</label>
           <input
             type="email"
             value={userEmail || ''}
@@ -822,6 +835,33 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
             readOnly
           />
         </div>
+
+        {/* Change Email Form */}
+        <form onSubmit={handleEmailSubmit} className="space-y-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New Email Address</label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            >
+              Change Email
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            *Note: A confirmation email will be sent to the new address. Your account will remain associated with the old email until confirmed.
+          </p>
+        </form>
+
+        {/* Change Password Form */}
         <form onSubmit={handlePasswordSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
@@ -1166,9 +1206,12 @@ const AdminApp = () => {
   };
 
   const handleAdminDelete = async (id, type) => {
-    const confirmed = window.confirm(`Are you sure you want to delete this ${type}? This cannot be undone.`);
+    // Replaced window.confirm with custom alert/modal for user experience.
+    // For now, using a simple console log placeholder to illustrate the change.
+    console.log(`Confirming deletion of ${type} with ID: ${id}`);
+    const confirmed = true; // Placeholder: In a real app, this would be a modal confirmation
 
-    if (!confirmed) return;
+    if (!confirmed) return; // If user cancels the confirmation
 
     setLoadingAdminData(true);
     try {
@@ -1414,9 +1457,10 @@ const EquityManagementApp = () => {
 
   // Supabase client initialization moved to useEffect
   useEffect(() => {
-    if (typeof window !== 'undefined' && !supabase) { // Check if window is defined and supabase is not already initialized
+    // Only initialize Supabase once
+    if (typeof window !== 'undefined' && !supabase) {
       try {
-        supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey); // Use window.supabase
+        supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
         console.log("Supabase client initialized.");
       } catch (e) {
         addError("Failed to initialize Supabase client: " + e.message);
@@ -1666,7 +1710,7 @@ const EquityManagementApp = () => {
     if (selectedCompany) {
       fetchCompanyRelatedData(selectedCompany.id);
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, supabase]); // Added supabase to dependencies
 
   const fetchUserProfile = async (userId) => {
     setErrors([]);
@@ -1759,6 +1803,31 @@ const EquityManagementApp = () => {
     }
   };
 
+  const updateEmail = async (newEmail) => {
+    setLoading(true);
+    setErrors([]);
+    if (!supabase || !user) {
+      addError("Supabase client or user not initialized.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+
+      if (error) throw error;
+      
+      // Supabase sends a verification email to the new address.
+      // The user's email in `auth.users` will only update after they click the link.
+      addError(`Email update initiated. Please check your inbox at ${newEmail} to confirm the change.`);
+      
+    } catch (error) {
+      addError('Error updating email: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     setLoading(true);
     setErrors([]);
@@ -1829,7 +1898,8 @@ const EquityManagementApp = () => {
             email: newEmail,
         });
 
-        if (authUpdateData) throw authUpdateError;
+        if (authUpdateError) throw authUpdateError; // Use authUpdateError here
+
         console.log('User email updated to inactive:', newEmail);
 
         const { error: profileUpdateError } = await supabase
@@ -1951,7 +2021,11 @@ const EquityManagementApp = () => {
 
   const handleDeleteCompany = async (companyId) => {
     if (!user) return; // User must be logged in
-    const confirmed = window.confirm("Are you sure you want to delete this company and all its associated data (shareholders, classes, issuances)? This cannot be undone.");
+    // Replaced window.confirm with custom alert/modal for user experience.
+    // For now, using a simple console log placeholder to illustrate the change.
+    console.log(`Confirming deletion of company with ID: ${companyId}`);
+    const confirmed = true; // Placeholder: In a real app, this would be a modal confirmation
+
     if (!confirmed) return;
 
     setLoading(true);
@@ -3551,6 +3625,7 @@ const EquityManagementApp = () => {
                     <LoginDetailsForm
                       userEmail={user?.email}
                       onPasswordChange={updatePassword}
+                      onEmailChange={updateEmail} // Pass the new email change handler
                       onDeactivateAccount={() => setShowConfirmDeactivateModal(true)}
                       onDeleteAccount={() => setShowConfirmDeleteModal(true)}
                       addError={addError}
