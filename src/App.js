@@ -860,6 +860,8 @@ const EquityManagementApp = () => {
       setCompanies([...companies, newCompany]);
       setSelectedCompany(newCompany);
       setShowCreateCompany(false);
+      fetchInitialData(user.id); // Re-fetch all companies to update the list
+      addError('Company created successfully!');
 
       const defaultShareClasses = [
         { name: 'Common', priority: 10, description: 'Standard common shares' },
@@ -892,7 +894,7 @@ const EquityManagementApp = () => {
   };
 
   const updateCompany = async (companyId, data) => {
-    if (!user || !selectedCompany) return;
+    if (!user) return; // User must be logged in
     setLoading(true);
     setErrors([]);
     if (!supabase) {
@@ -912,7 +914,7 @@ const EquityManagementApp = () => {
 
       if (error) throw error;
       setCompanies(companies.map(comp => comp.id === companyId ? { ...comp, ...data } : comp));
-      setSelectedCompany(prev => prev.id === companyId ? { ...prev, ...data } : prev);
+      setSelectedCompany(prev => prev && prev.id === companyId ? { ...prev, ...data } : prev); // Update if it was the selected company
       setShowEditCompany(false);
       setEditingCompanyData(null);
       addError('Company updated successfully!');
@@ -924,7 +926,7 @@ const EquityManagementApp = () => {
   };
 
   const handleDeleteCompany = async (companyId) => {
-    if (!user || !selectedCompany) return;
+    if (!user) return; // User must be logged in
     const confirmed = window.confirm("Are you sure you want to delete this company and all its associated data (shareholders, classes, issuances)? This cannot be undone.");
     if (!confirmed) return;
 
@@ -947,8 +949,10 @@ const EquityManagementApp = () => {
       }
 
       setCompanies(companies.filter(comp => comp.id !== companyId));
-      setSelectedCompany(null); // Clear selected company if deleted
-      fetchInitialData(user.id); // Re-fetch companies
+      if (selectedCompany && selectedCompany.id === companyId) {
+        setSelectedCompany(null); // Clear selected company if deleted
+      }
+      fetchInitialData(user.id); // Re-fetch companies to update the list and potentially select a new one
       addError('Company and all associated data deleted successfully!');
     } catch (error) {
       addError('Error deleting company: ' + error.message);
@@ -1032,12 +1036,14 @@ const EquityManagementApp = () => {
   };
 
   const handleEditShareholder = (shareholderId) => {
-    const shareholderToEdit = shareholders.find(sh => sh.id === shareholderId);
+    // Ensure shareholderId is treated as a number for comparison
+    const idToFind = parseInt(shareholderId, 10);
+    const shareholderToEdit = shareholders.find(sh => sh.id === idToFind);
     if (shareholderToEdit) {
       setEditingShareholderData(shareholderToEdit);
       setShowEditShareholder(true);
     } else {
-      addError("Shareholder not found for editing.");
+      addError(`Shareholder with ID ${shareholderId} not found for editing.`);
     }
   };
 
@@ -2032,6 +2038,7 @@ const EquityManagementApp = () => {
                   onEditCompany={handleEditCompany}
                   onDeleteCompany={handleDeleteCompany}
                   addError={addError}
+                  setShowCreateCompany={setShowCreateCompany} // Pass setter for create modal
                 />
               )}
 
@@ -3214,12 +3221,7 @@ const UserProfileForm = ({ userProfile, onSubmit, addError }) => {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-          <textarea
-            value={profileData.address}
-            onChange={(e) => setProfileData({...profileData.address, address: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows="3"
-          />
+          <AddressForm initialAddress={profileData.address} onAddressChange={(newAddress) => setProfileData(prev => ({ ...prev, address: newAddress }))} />
         </div>
         <div className="flex justify-end mt-4">
           <button
@@ -3329,7 +3331,7 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onDeactivateAccount, on
 };
 
 // SubscriptionPage Component
-const SubscriptionPage = ({ userProfile, handleCheckout, loading }) => {
+const SubscriptionPage = ({ userProfile, handleCheckout, loading, addError }) => {
   const isPremiumUser = userProfile?.subscription_status === 'active';
 
   return (
@@ -3421,7 +3423,7 @@ const AddressForm = ({ initialAddress, onAddressChange }) => {
 };
 
 // New CompaniesPage Component
-const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError }) => {
+const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError, setShowCreateCompany }) => {
   const companyTableColumns = [
     { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
     { key: 'description', header: 'Description', isSortable: true },
@@ -3433,7 +3435,7 @@ const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError }) 
       <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Your Companies</h2>
       <div className="flex justify-end">
         <button
-          onClick={() => { /* Implement create new company modal */ }}
+          onClick={() => setShowCreateCompany(true)} // Connect to the state setter
           className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
           style={{ backgroundColor: theme.primary, color: theme.cardBackground }}
         >
