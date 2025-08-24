@@ -6,6 +6,10 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
+# Import for Brevo (uncomment and install if using Brevo)
+# from sib_api_v3_sdk.rest import ApiException
+# from sib_api_v3_sdk import Configuration, ApiClient, TransactionalEmailsApi, SendSmtpEmail
+
 # --- Configuration and Initialization ---
 
 # Initialize FastAPI app
@@ -14,6 +18,7 @@ app = FastAPI()
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+# BREVO_API_KEY = os.environ.get("BREVO_API_KEY") # Uncomment if using Brevo
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("CRITICAL: Supabase environment variables not set.")
@@ -42,7 +47,7 @@ class Issuance(BaseModel):
     shares: int
     price_per_share: float
     issue_date: str
-    round: Optional[int] = None # Changed to int
+    round: Optional[int] = None
     round_description: Optional[str] = None
     payment_status: Optional[str] = None
     created_at: Optional[str] = None
@@ -53,10 +58,10 @@ class FutureIssuance(BaseModel):
     shares: int
     pricePerShare: float
     issueDate: str
-    round: Optional[int] = None # Changed to int
+    round: Optional[int] = None
 
 class CalculationPayload(BaseModel):
-    companyId: int
+    companyId: str # Changed to str for UUID
     currentIssuances: List[Issuance]
     shareholders: List[Shareholder]
     shareClasses: List[ShareClass]
@@ -108,7 +113,7 @@ def calculate_equity_snapshot(issuances_data: List[dict], shareholders_data: Lis
     }
 
 # --- Email Sending Placeholder (Replace with Brevo/SMTP integration) ---
-def send_shareholder_email(to_email: str, subject: str, body: str):
+def send_shareholder_email(to_email: str, subject: str, html_body: str):
     """
     Placeholder function to send email.
     In a real application, replace this with actual Brevo/SMTP integration.
@@ -116,21 +121,23 @@ def send_shareholder_email(to_email: str, subject: str, body: str):
     print(f"\n--- Sending Email ---")
     print(f"To: {to_email}")
     print(f"Subject: {subject}")
-    print(f"Body:\n{body}")
+    print(f"Body (HTML):\n{html_body}")
     print(f"---------------------\n")
-    # Example for Brevo integration (requires Brevo SDK or HTTP calls)
-    # from sib_api_v3_sdk.rest import ApiException
-    # from sib_api_v3_sdk import Configuration, ApiClient, TransactionalEmailsApi, SendSmtpEmail
+
+    # Example for Brevo integration (requires Brevo SDK and BREVO_API_KEY environment variable)
+    # if not BREVO_API_KEY:
+    #     print("WARNING: BREVO_API_KEY not set. Cannot send actual emails.")
+    #     return
     #
     # configuration = Configuration()
-    # configuration.api_key['api-key'] = os.environ.get("BREVO_API_KEY")
+    # configuration.api_key['api-key'] = BREVO_API_KEY
     #
     # api_instance = TransactionalEmailsApi(ApiClient(configuration))
     # send_smtp_email = SendSmtpEmail(
     #     to=[{"email": to_email}],
     #     subject=subject,
-    #     html_content=f"<html><body>{body.replace('\n', '<br>')}</body></html>",
-    #     sender={"name": "Kapitalized", "email": "no-reply@kapitalized.com"}
+    #     html_content=html_body,
+    #     sender={"name": "Kapitalized", "email": "no-reply@kapitalized.com"} # Replace with your sender email
     # )
     #
     # try:
@@ -139,6 +146,28 @@ def send_shareholder_email(to_email: str, subject: str, body: str):
     # except ApiException as e:
     #     print(f"Exception when calling SMTPApi->send_transac_email: {e}")
     #     raise HTTPException(status_code=500, detail=f"Failed to send email via Brevo: {e}")
+
+def load_email_template(template_name: str, context: dict) -> str:
+    """
+    Loads an HTML email template and renders it with provided context.
+    For production, consider using a proper templating engine like Jinja2.
+    """
+    template_path = os.path.join(os.path.dirname(__file__), "email_templates", f"{template_name}.html")
+    try:
+        with open(template_path, "r") as f:
+            template_content = f.read()
+        
+        # Simple string replacement for demonstration.
+        # For complex templates, use a dedicated templating engine.
+        for key, value in context.items():
+            template_content = template_content.replace(f"{{{key}}}", str(value))
+        return template_content
+    except FileNotFoundError:
+        print(f"Email template {template_name}.html not found at {template_path}")
+        raise HTTPException(status_code=500, detail=f"Email template '{template_name}' not found.")
+    except Exception as e:
+        print(f"Error loading or rendering email template: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing email template: {e}")
 
 
 # --- API Endpoints ---
@@ -325,30 +354,36 @@ async def notify_shareholders(payload: EmailNotificationPayload):
                 if iss['shareholder_id'] == shareholder['id']
             ]
 
-            email_body_parts = [
-                f"Dear {shareholder['name']},\n",
-                f"This email provides a summary of your shareholdings in {company['name']}.\n",
-                "Your Share Issuances:\n"
-            ]
-
+            # Prepare data for template
+            issuances_html = ""
             if shareholder_issuances:
                 for iss in shareholder_issuances:
                     share_class_name = share_classes_map.get(iss['share_class_id'], 'Unknown Class')
-                    email_body_parts.append(
-                        f"- Shares: {iss['shares']} of {share_class_name} at ${iss['price_per_share']:.2f} per share "
-                        f"(Total Value: ${iss['shares'] * iss['price_per_share']:.2f}) "
-                        f"on {iss['issue_date']} (Round: {iss.get('round_description', 'N/A')})"
-                    )
+                    issuances_html += f"""
+                        <li>
+                            <strong>Shares:</strong> {iss['shares']} of {share_class_name} <br/>
+                            <strong>Price per Share:</strong> ${iss['price_per_share']:.2f} <br/>
+                            <strong>Total Value:</strong> ${iss['shares'] * iss['price_per_share']:.2f} <br/>
+                            <strong>Issue Date:</strong> {iss['issue_date']} <br/>
+                            <strong>Round:</strong> {iss.get('round_description', 'N/A')}
+                        </li>
+                    """
             else:
-                email_body_parts.append("- No share issuances recorded.")
+                issuances_html = "<li>No share issuances recorded.</li>"
 
-            email_body_parts.append("\nIf you have any questions, please contact us.")
-            email_body_parts.append("\nSincerely,\nThe Kapitalized Team")
+            template_context = {
+                "shareholder_name": shareholder['name'],
+                "company_name": company['name'],
+                "issuances_list_html": f"<ul>{issuances_html}</ul>",
+                "contact_email": "support@kapitalized.com" # Example contact email
+            }
 
             email_subject = f"Your Shareholding Summary in {company['name']}"
-            email_body = "\n".join(email_body_parts)
-
-            send_shareholder_email(shareholder['email'], email_subject, email_body)
+            
+            # Load and render template
+            html_content = load_email_template("shareholder_notification", template_context)
+            
+            send_shareholder_email(shareholder['email'], email_subject, html_content)
             emails_sent_count += 1
 
         return {"message": f"Email notifications initiated for {emails_sent_count} shareholders."}
