@@ -17,22 +17,16 @@ app = FastAPI()
 
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+# IMPORTANT: Ensure your Vercel Environment Variable is named SUPABASE_KEY and contains your Supabase Service Role Key.
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") # Corrected: now explicitly looking for "SUPABASE_KEY"
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 
-# Add diagnostic prints for environment variables
-print(f"DEBUG: SUPABASE_URL read: {SUPABASE_URL}")
-print(f"DEBUG: SUPABASE_KEY read: {'*' * len(SUPABASE_KEY) if SUPABASE_KEY else 'None'}") # Mask key for security
-print(f"DEBUG: BREVO_API_KEY read: {'*' * len(BREVO_API_KEY) if BREVO_API_KEY else 'None'}") # Mask key for security
-
-
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("CRITICAL: Supabase environment variables (SUPABASE_URL or SUPABASE_KEY) not set or are empty. Supabase client will not be initialized.")
+    print("CRITICAL: Supabase environment variables (SUPABASE_URL or SUPABASE_KEY) not set or are empty.")
     supabase = None
 else:
     try:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print(f"DEBUG: Supabase client object type after create_client: {type(supabase)}")
         print("Supabase client initialized in FastAPI backend.")
     except Exception as e:
         print(f"CRITICAL: Failed to initialize Supabase client in FastAPI: {e}")
@@ -131,7 +125,7 @@ def send_shareholder_email(to_email: str, subject: str, html_body: str):
     print(f"\n--- Attempting to Send Email via Brevo ---")
     print(f"To: {to_email}")
     print(f"Subject: {subject}")
-    print(f"Body (HTML):\n{html_body[:200]}...") # Print first 200 chars to avoid clutter
+    print(f"Body (HTML):\n{html_body[:200]}...")
     print(f"-----------------------------------------\n")
 
     if not BREVO_API_KEY:
