@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Users, Building2, Trash2, Edit, User, LogOut, Mail, BarChart3, Settings, XCircle } from 'lucide-react';
+import { PlusCircle, Users, Building2, Trash2, Edit, User, LogOut, Mail, BarChart3, Settings, XCircle, CreditCard } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import axios from 'axios';
 import AddressForm from './AddressForm';
@@ -7,20 +7,10 @@ import CompanyForm from './CompanyForm';
 import ShareholderForm from './ShareholderForm';
 import Modal from './Modal';
 import Dashboard from './Dashboard';
+import { theme, countryData, SHAREHOLDER_TYPES } from './constants';
 
 // Date stamp for the last update to this file: 202508260635
 const WOOCOMMERCE_SUBSCRIPTION_URL = "https://your-wordpress-site.com/product/your-subscription-product/";
-
-const theme = {
-  primary: '#1a73e8',
-  secondary: '#34a853',
-  accent: '#fbbc05',
-  background: '#f8f9fa',
-  cardBackground: '#ffffff',
-  text: '#202124',
-  lightText: '#5f6368',
-  borderColor: '#dadce0',
-};
 
 let supabaseClient = null;
 if (typeof window !== 'undefined' && window.supabase) {
@@ -34,14 +24,6 @@ if (typeof window !== 'undefined' && window.supabase) {
 } else {
   console.warn("Supabase library not loaded or window undefined.");
 }
-
-const countryData = {
-  "Australia": ["New South Wales", "Victoria", "Queensland", "Western Australia", "South Australia", "Tasmania", "Australian Capital Territory", "Northern Territory"],
-  "United States": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"],
-  "Canada": ["Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Nova Scotia", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan"]
-};
-
-const SHAREHOLDER_TYPES = ['Founder', 'Management', 'Investor', 'Advisor', 'Employee', 'Other'];
 
 const EquityManagementApp = () => {
   const [session, setSession] = useState(null);
@@ -289,55 +271,6 @@ const EquityManagementApp = () => {
   //   } catch (error) {
   //     addError('Error updating profile: ' + error.message);
   //   }
-  // };
-
-  // const updatePassword = async (newPassword) => { // Commented out as unused
-  //   try {
-  //     const { error } = await window.supabaseClient.auth.updateUser({ password: newPassword });
-  //     if (error) throw error;
-  //     addError('Password updated successfully!');
-  //   } catch (error) {
-  //     addError('Error updating password: ' + error.message);
-  //   }
-  // };
-
-  // const updateEmail = async (newEmail) => { // Commented out as unused
-  //   try {
-  //     const { error } = await window.supabaseClient.auth.updateUser({ email: newEmail });
-  //     if (error) throw error;
-  //     addError('Email update request sent. Check your inbox to confirm!');
-  //   } catch (error) {
-  //     addError('Error updating email: ' + error.message);
-  //   }
-  // };
-
-  // const handleDeactivateAccount = async () => { // Commented out as unused
-  //   try {
-  //     await window.supabaseClient.auth.updateUser({ email: `${user.email}+deactivated_${Date.now()}@example.com` });
-  //     await window.supabaseClient.from('user_profiles').update({ status: 'inactive' }).eq('id', user.id);
-  //     await window.supabaseClient.auth.signOut();
-  //     addError('Account deactivated successfully!');
-  //     window.location.href = '/';
-  //   } catch (error) {
-  //     addError('Error deactivating account: ' + error.message);
-  //   }
-  //   setShowConfirmDeactivateModal(false);
-  // };
-
-  // const handleDeleteAccount = async () => { // Commented out as unused
-  //   try {
-  //     await window.supabaseClient.from('companies').delete().eq('user_id', user.id);
-  //     await window.supabaseClient.from('shareholders').delete().eq('user_id', user.id);
-  //     await window.supabaseClient.from('share_classes').delete().eq('user_id', user.id);
-  //     await window.supabaseClient.from('share_issuances').delete().eq('user_id', user.id);
-  //     await window.supabaseClient.from('user_profiles').delete().eq('id', user.id);
-  //     await window.supabaseClient.auth.signOut();
-  //     addError('Account deleted successfully!');
-  //     window.location.href = '/';
-  //   } catch (error) {
-  //     addError('Error deleting account: ' + error.message);
-  //   }
-  //   setShowConfirmDeleteModal(false);
   // };
 
   return (
