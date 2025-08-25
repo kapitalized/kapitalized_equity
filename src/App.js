@@ -10,7 +10,7 @@ const Home = () => {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/companies');
+        const response = await axios.get('https://kapitalized-equity-git-python-app-kapitalizeds-projects.vercel.app/api/companies');
         setCompanies(response.data);
         setLoading(false);
       } catch (error) {
@@ -42,7 +42,7 @@ const CompanyDetail = ({ match }) => {
   useEffect(() => {
     const fetchShareholders = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/shareholders/${match.params.id}`);
+        const response = await axios.get(`https://kapitalized-equity-git-python-app-kapitalizeds-projects.vercel.app/api/shareholders/${match.params.id}`);
         setShareholders(response.data);
         setLoading(false);
       } catch (error) {
