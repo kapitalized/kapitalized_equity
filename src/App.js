@@ -6,15 +6,17 @@ import './App.css';
 const Home = () => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await axios.get('https://kapitalized-equity-git-python-app-kapitalizeds-projects.vercel.app/api/companies');
+        const response = await axios.get('/api/companies');
         setCompanies(response.data);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching companies:', error);
+        setError('Failed to load companies. Check the backend or network.');
         setLoading(false);
       }
     };
@@ -22,6 +24,7 @@ const Home = () => {
   }, []);
 
   if (loading) return <div className="text-center p-4">Loading...</div>;
+  if (error) return <div className="text-center p-4 text-red-500">{error}</div>;
 
   return (
     <div className="container mx-auto p-4">
@@ -38,15 +41,17 @@ const Home = () => {
 const CompanyDetail = ({ match }) => {
   const [shareholders, setShareholders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchShareholders = async () => {
       try {
-        const response = await axios.get(`https://kapitalized-equity-git-python-app-kapitalizeds-projects.vercel.app/api/shareholders/${match.params.id}`);
+        const response = await axios.get(`/api/shareholders/${match.params.id}`);
         setShareholders(response.data);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching shareholders:', error);
+        setError('Failed to load shareholders. Check the backend or network.');
         setLoading(false);
       }
     };
@@ -54,6 +59,7 @@ const CompanyDetail = ({ match }) => {
   }, [match.params.id]);
 
   if (loading) return <div className="text-center p-4">Loading...</div>;
+  if (error) return <div className="text-center p-4 text-red-500">{error}</div>;
 
   return (
     <div className="container mx-auto p-4">
