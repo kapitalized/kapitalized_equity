@@ -12,6 +12,7 @@ const Home = () => {
     const fetchCompanies = async () => {
       try {
         const response = await axios.get('/api/companies');
+        console.log('Companies data:', response.data); // Debug log
         setCompanies(response.data.data || response.data);
         setLoading(false);
       } catch (error) {
@@ -48,6 +49,7 @@ const CompanyDetail = ({ match }) => {
     const fetchShareholders = async () => {
       try {
         const response = await axios.get(`/api/shareholders/${match.params.id}`);
+        console.log('Shareholders data:', response.data); // Debug log
         setShareholders(response.data.data || response.data);
         setLoading(false);
       } catch (error) {
@@ -81,7 +83,7 @@ const App = () => {
       <div className="App">
         <Routes>
           <Route exact path="/" element={<Home />} />
-          <Route path="/company/:id" element={<CompanyDetail />} />
+          <Route path="/shareholders/:id" element={<CompanyDetail />} />
         </Routes>
       </div>
     </Router>
