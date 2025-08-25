@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Users, Building2, Trash2, Edit, User, LogOut, Mail, BarChart3 } from 'lucide-react';
+import { PlusCircle, Users, Building2, Trash2, Edit, User, LogOut, Mail, BarChart3, Settings, XCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import axios from 'axios';
 import AddressForm from './AddressForm';
@@ -8,7 +8,7 @@ import ShareholderForm from './ShareholderForm';
 import Modal from './Modal';
 import Dashboard from './Dashboard';
 
-// Date stamp for the last update to this file: 202508260625
+// Date stamp for the last update to this file: 202508260635
 const WOOCOMMERCE_SUBSCRIPTION_URL = "https://your-wordpress-site.com/product/your-subscription-product/";
 
 const theme = {
@@ -66,6 +66,7 @@ const EquityManagementApp = () => {
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [futureScenarioResults, setFutureScenarioResults] = useState(null);
   const [selectedShareholdersForEmail, setSelectedShareholdersForEmail] = useState([]);
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(null); // Added to manage delete confirmation
   // const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false); // Commented out as unused
   // const [loading, setLoading] = useState(false); // Commented out as unused
   // const [futureIssuanceData, setFutureIssuanceData] = useState({ shareholderId: '', shareClassId: '', shares: '', pricePerShare: '', issueDate: new Date().toISOString().split('T')[0], roundNumber: '', roundTitle: '' }); // Commented out as unused
@@ -437,13 +438,13 @@ const EquityManagementApp = () => {
                   {showCreateCompany && <Modal onClose={() => setShowCreateCompany(false)}><CompanyForm onSubmit={createCompany} onCancel={() => setShowCreateCompany(false)} initialData={null} countryData={countryData} /></Modal>}
                   {showEditCompany && editingCompanyData && <Modal onClose={() => setShowEditCompany(false)}><CompanyForm onSubmit={(data) => updateCompany(editingCompanyData.id, data)} onCancel={() => setShowEditCompany(false)} initialData={editingCompanyData} countryData={countryData} /></Modal>}
                   {showConfirmDeleteModal && (
-                    <Modal onClose={() => setShowConfirmDeleteModal(false)}>
+                    <Modal onClose={() => setShowConfirmDeleteModal(null)}>
                       <div>
                         <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Confirm Delete</h3>
                         <p>Are you sure you want to delete this company?</p>
                         <div className="flex justify-end space-x-2 mt-6">
-                          <button onClick={() => setShowConfirmDeleteModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
-                          <button onClick={() => { deleteCompany(showConfirmDeleteModal); setShowConfirmDeleteModal(false); }} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Delete</button>
+                          <button onClick={() => setShowConfirmDeleteModal(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
+                          <button onClick={() => { deleteCompany(showConfirmDeleteModal); setShowConfirmDeleteModal(null); }} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Delete</button>
                         </div>
                       </div>
                     </Modal>
@@ -478,13 +479,13 @@ const EquityManagementApp = () => {
                   {showCreateShareholder && <Modal onClose={() => setShowCreateShareholder(false)}><ShareholderForm onSubmit={createShareholder} onCancel={() => setShowCreateShareholder(false)} /></Modal>}
                   {showEditShareholder && editingShareholderData && <Modal onClose={() => setShowEditShareholder(false)}><ShareholderForm onSubmit={(data) => updateShareholder(editingShareholderData.id, data)} onCancel={() => setShowEditShareholder(false)} initialData={editingShareholderData} /></Modal>}
                   {showConfirmDeleteModal && (
-                    <Modal onClose={() => setShowConfirmDeleteModal(false)}>
+                    <Modal onClose={() => setShowConfirmDeleteModal(null)}>
                       <div>
                         <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Confirm Delete</h3>
                         <p>Are you sure you want to delete this shareholder?</p>
                         <div className="flex justify-end space-x-2 mt-6">
-                          <button onClick={() => setShowConfirmDeleteModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
-                          <button onClick={() => { deleteShareholder(showConfirmDeleteModal); setShowConfirmDeleteModal(false); }} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Delete</button>
+                          <button onClick={() => setShowConfirmDeleteModal(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
+                          <button onClick={() => { deleteShareholder(showConfirmDeleteModal); setShowConfirmDeleteModal(null); }} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Delete</button>
                         </div>
                       </div>
                     </Modal>
