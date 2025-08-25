@@ -7,10 +7,28 @@ import CompanyForm from './CompanyForm';
 import ShareholderForm from './ShareholderForm';
 import Modal from './Modal';
 import Dashboard from './Dashboard';
-import { theme, countryData, SHAREHOLDER_TYPES } from './constants';
 
-// Date stamp for the last update to this file: 202508260635
+// Date stamp for the last update to this file: 202508260655
 const WOOCOMMERCE_SUBSCRIPTION_URL = "https://your-wordpress-site.com/product/your-subscription-product/";
+
+const theme = {
+  primary: '#1a73e8',
+  secondary: '#34a853',
+  accent: '#fbbc05',
+  background: '#f8f9fa',
+  cardBackground: '#ffffff',
+  text: '#202124',
+  lightText: '#5f6368',
+  borderColor: '#dadce0',
+};
+
+const countryData = {
+  "Australia": ["New South Wales", "Victoria", "Queensland", "Western Australia", "South Australia", "Tasmania", "Australian Capital Territory", "Northern Territory"],
+  "United States": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"],
+  "Canada": ["Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Nova Scotia", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan"]
+};
+
+const SHAREHOLDER_TYPES = ['Founder', 'Management', 'Investor', 'Advisor', 'Employee', 'Other'];
 
 let supabaseClient = null;
 if (typeof window !== 'undefined' && window.supabase) {
