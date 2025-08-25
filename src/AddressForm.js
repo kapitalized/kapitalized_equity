@@ -1,11 +1,13 @@
-const AddressForm = ({ initialAddress, onAddressChange }) => {
+import React, { useState, useEffect } from 'react';
+
+const AddressForm = ({ initialAddress, onAddressChange, countryData }) => {
   const [address, setAddress] = useState(initialAddress || { line1: '', line2: '', country: '', state: '', postcode: '' });
   const [states, setStates] = useState([]);
 
   useEffect(() => {
     if (address.country) setStates(countryData[address.country] || []);
     else setStates([]);
-  }, [address.country]);
+  }, [address.country, countryData]);
 
   const handleChange = (field, value) => {
     const newAddress = { ...address, [field]: value };
