@@ -1049,7 +1049,7 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
   const totals = calculateTotals();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full"> {/* Added w-full */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
@@ -1061,7 +1061,7 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
           style={{ borderColor: theme.borderColor }}
         />
       </div>
-      <div className="overflow-x-auto bg-white shadow rounded-lg">
+      <div className="overflow-x-auto bg-white shadow rounded-lg"> {/* Added overflow-x-auto */}
         <table className="min-w-full divide-y" style={{ borderColor: theme.borderColor }}>
           <thead style={{ backgroundColor: theme.background }}>
             <tr>
@@ -2212,7 +2212,7 @@ const EquityManagementApp = () => {
       setEditingShareholderData(shareholderToEdit);
       setShowEditShareholder(true);
     } else {
-      addError(`Shareholder with ID ${shareholderId} not found for editing.`);
+      addError("Shareholder with ID ${shareholderId} not found for editing.");
     }
   };
 
@@ -2518,7 +2518,7 @@ const EquityManagementApp = () => {
               continue;
             }
 
-            let shareClass = shareClasses.find(sc => sc.name === shareClassName);
+            let shareClass = shareClasses.find(sc => sc.id === shareClassName); // Changed to use ID
             if (!shareClass) {
               console.warn(`Share class "${shareClassName}" not found. Skipping issuance.`);
               continue;
@@ -3407,7 +3407,7 @@ const EquityManagementApp = () => {
               {activeTab === 'issuances' && (
                 <div className="space-y-6">
                   <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Share Issuances</h2>
-                  <div className="flex justify-end">
+                  <div className="flex justify-start"> {/* Changed to justify-start */}
                     <button
                       onClick={() => setShowCreateIssuance(true)}
                       className="px-4 py-2 rounded-md hover:opacity-90 flex items-center"
@@ -3419,7 +3419,7 @@ const EquityManagementApp = () => {
                   </div>
 
                   {/* Table: Shares Issued ex-Options */}
-                  <div className="bg-white shadow rounded-lg p-6">
+                  <div className="bg-white shadow rounded-lg p-6 w-full"> {/* Added w-full */}
                     <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Shares Issued ex-Options</h3>
                     <SortableTable
                       data={filterIssuancesByShareType(shareIssuances.filter(issuance => issuance.company_id === selectedCompany.id), true)}
@@ -3431,7 +3431,7 @@ const EquityManagementApp = () => {
                   </div>
 
                   {/* Table: Convertible and Options Shares */}
-                  <div className="bg-white shadow rounded-lg p-6">
+                  <div className="bg-white shadow rounded-lg p-6 w-full"> {/* Added w-full */}
                     <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Convertible and Options Shares</h3>
                     <SortableTable
                       data={filterIssuancesOnlyExcludedShareTypes(shareIssuances.filter(issuance => issuance.company_id === selectedCompany.id))}
