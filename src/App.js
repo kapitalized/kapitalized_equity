@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 
@@ -71,10 +71,10 @@ const App = () => {
   return (
     <Router>
       <div className="App">
-        <Switch>
-          <Route exact path="/" component={Home} />
-          <Route path="/company/:id" component={CompanyDetail} />
-        </Switch>
+      <Routes>
+        <Route exact path="/" element={<Home />} />
+        <Route path="/company/:id" element={<CompanyDetail />} />
+      </Routes>
       </div>
     </Router>
   );
