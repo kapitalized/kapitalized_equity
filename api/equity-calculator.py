@@ -17,11 +17,12 @@ app = FastAPI()
 
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY") # Uncommented
+# IMPORTANT: Ensure your Vercel Environment Variable is named SUPABASE_KEY and contains your Supabase Service Role Key.
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") # Corrected: now explicitly looking for "SUPABASE_KEY"
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("CRITICAL: Supabase environment variables not set.")
+    print("CRITICAL: Supabase environment variables (SUPABASE_URL or SUPABASE_KEY) not set or are empty.")
     supabase = None
 else:
     try:
@@ -66,15 +67,14 @@ class FutureIssuance(BaseModel):
     round: Optional[int] = None
 
 class CalculationPayload(BaseModel):
-    companyId: str # Changed to str for UUID
+    companyId: str
     currentIssuances: List[Issuance]
     shareholders: List[Shareholder]
     shareClasses: List[ShareClass]
     futureIssuance: Optional[FutureIssuance] = None
 
-# New Pydantic model for email notification payload
 class EmailNotificationPayload(BaseModel):
-    company_id: str # Assuming company IDs are strings (UUIDs)
+    company_id: str
     shareholder_ids: List[int]
 
 # --- Core Calculation Logic (Refactored) ---
@@ -92,13 +92,12 @@ def calculate_equity_snapshot(issuances_data: List[dict], shareholders_data: Lis
     for df in [df_issuances, df_shareholders, df_share_classes]:
         for col in ['id', 'shareholder_id', 'share_class_id']:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce') # Use coerce to handle non-numeric gracefully
+                df[col] = pd.to_numeric(df[col], errors='coerce')
 
     df_issuances['value'] = df_issuances['shares'] * df_issuances['price_per_share']
     total_shares = df_issuances['shares'].sum()
     total_value = df_issuances['value'].sum()
 
-    # Create shareholder summary
     summary = df_issuances.groupby('shareholder_id').agg(
         totalShares=('shares', 'sum'),
         totalValue=('value', 'sum')
@@ -126,12 +125,12 @@ def send_shareholder_email(to_email: str, subject: str, html_body: str):
     print(f"\n--- Attempting to Send Email via Brevo ---")
     print(f"To: {to_email}")
     print(f"Subject: {subject}")
-    print(f"Body (HTML):\n{html_body[:200]}...") # Print first 200 chars to avoid clutter
+    print(f"Body (HTML):\n{html_body[:200]}...")
     print(f"-----------------------------------------\n")
 
     if not BREVO_API_KEY:
         print("WARNING: BREVO_API_KEY not set. Cannot send actual emails via Brevo.")
-        return
+        return {"status": "error", "message": "Brevo API key not configured."}
 
     configuration = Configuration()
     configuration.api_key['api-key'] = BREVO_API_KEY
@@ -141,38 +140,39 @@ def send_shareholder_email(to_email: str, subject: str, html_body: str):
         to=[{"email": to_email}],
         subject=subject,
         html_content=html_body,
-        sender={"name": "Kapitalized", "email": "no-reply@kapitalized.com"} # IMPORTANT: Replace with your verified sender email in Brevo
+        sender={"name": "Kapitalized", "email": "no-reply@kapitalized.com"} # IMPORTANT: Replace with your VERIFIED sender email in Brevo
     )
 
     try:
         api_response = api_instance.send_transac_email(send_smtp_email)
         print(f"Brevo API response: {api_response}")
+        return {"status": "success", "message": "Email sent successfully via Brevo."}
     except ApiException as e:
-        print(f"Exception when calling SMTPApi->send_transac_email: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to send email via Brevo: {e}")
+        error_msg = f"Brevo API Exception: {e.reason} - {e.body}"
+        print(f"Exception when calling SMTPApi->send_transac_email: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email via Brevo: {error_msg}")
     except Exception as e:
-        print(f"An unexpected error occurred during Brevo email sending: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during email sending: {e}")
+        error_msg = f"An unexpected error occurred during Brevo email sending: {e}"
+        print(f"{error_msg}")
+        raise HTTPException(status_code=500, detail=f"{error_msg}")
 
 
 def load_email_template(template_name: str, context: dict) -> str:
     """
     Loads an HTML email template and renders it with provided context.
-    For production, consider using a proper templating engine like Jinja2.
     """
     template_path = os.path.join(os.path.dirname(__file__), "email_templates", f"{template_name}.html")
+    print(f"Attempting to load email template from: {template_path}")
     try:
         with open(template_path, "r") as f:
             template_content = f.read()
         
-        # Simple string replacement for demonstration.
-        # For complex templates, use a dedicated templating engine.
         for key, value in context.items():
             template_content = template_content.replace(f"{{{key}}}", str(value))
         return template_content
     except FileNotFoundError:
         print(f"Email template {template_name}.html not found at {template_path}")
-        raise HTTPException(status_code=500, detail=f"Email template '{template_name}' not found.")
+        raise HTTPException(status_code=500, detail=f"Email template '{template_name}' not found at '{template_path}'. Ensure 'api/email_templates/{template_name}.html' exists in your deployment.")
     except Exception as e:
         print(f"Error loading or rendering email template: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing email template: {e}")
@@ -180,7 +180,6 @@ def load_email_template(template_name: str, context: dict) -> str:
 
 # --- API Endpoints ---
 
-# Health Check Endpoint
 @app.get("/api/health")
 async def health_check():
     """
@@ -206,20 +205,17 @@ async def get_equity_calculation(payload: CalculationPayload):
 
         if payload.futureIssuance:
             future_issuance_dict = payload.futureIssuance.dict(by_alias=True)
-            # Map frontend camelCase to Python snake_case
             future_issuance_dict['shareholder_id'] = future_issuance_dict.pop('shareholderId')
             future_issuance_dict['share_class_id'] = future_issuance_dict.pop('shareClassId')
             future_issuance_dict['price_per_share'] = future_issuance_dict.pop('pricePerShare')
             future_issuance_dict['issue_date'] = future_issuance_dict.pop('issueDate')
-            # Assuming 'round' from frontend is 'roundNumber' and 'roundTitle' is 'round_description'
-            future_issuance_dict['round'] = future_issuance_dict.pop('roundNumber') # Use roundNumber for round
-            future_issuance_dict['round_description'] = future_issuance_dict.pop('roundTitle') # Use roundTitle for round_description
-            future_issuance_dict['id'] = 999999 # Dummy ID for calculation
+            future_issuance_dict['round'] = future_issuance_dict.pop('roundNumber')
+            future_issuance_dict['round_description'] = future_issuance_dict.pop('roundTitle')
+            future_issuance_dict['id'] = 999999
 
             all_issuances = current_issuances_dict + [future_issuance_dict]
             future_state = calculate_equity_snapshot(all_issuances, shareholders_dict, share_classes_dict)
 
-            # Add comparison percentages
             current_percentages = {sh['id']: sh['percentage'] for sh in current_state['shareholderSummary']}
             for future_sh in future_state['shareholderSummary']:
                 current_perc = current_percentages.get(future_sh['id'], 0)
@@ -243,29 +239,24 @@ async def get_admin_data(entity: str):
         "users": "user_profiles",
         "companies": "companies",
         "issuances": "share_issuances",
-        "shareholders": "shareholders", # Added for completeness
-        "shareclasses": "share_classes", # Added for completeness
+        "shareholders": "shareholders",
+        "shareclasses": "share_classes",
     }
     if entity not in table_map:
         raise HTTPException(status_code=404, detail="Entity not found.")
 
     try:
-        # For 'users', we need to fetch from 'auth.users' for core user data
-        # and 'user_profiles' for profile data.
         if entity == "users":
-            # Fetch from auth.users (requires service role key)
             auth_users_response = supabase.auth.admin.list_users()
             auth_users_data = [{"id": user.id, "email": user.email, "created_at": user.created_at} for user in auth_users_response.data.users]
 
-            # Fetch from user_profiles
             user_profiles_response = supabase.from_('user_profiles').select('*').execute()
             user_profiles_data = user_profiles_response.data
 
-            # Merge data, prioritizing user_profiles for display fields
             merged_users = []
             for auth_user in auth_users_data:
                 profile = next((p for p in user_profiles_data if p['id'] == auth_user['id']), {})
-                merged_users.append({**auth_user, **profile}) # Merge, profile data overwrites auth data if keys overlap
+                merged_users.append({**auth_user, **profile})
             return merged_users
         else:
             response = supabase.from_(table_map[entity]).select('*').execute()
@@ -275,13 +266,13 @@ async def get_admin_data(entity: str):
         raise HTTPException(status_code=500, detail=f"Failed to fetch {entity}: {e}")
 
 @app.delete("/api/admin/{entity}/{item_id}")
-async def delete_admin_data(entity: str, item_id: str): # Changed item_id to str for UUIDs
+async def delete_admin_data(entity: str, item_id: str):
     """Endpoint to delete data from the admin panel."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase client not initialized. Cannot delete admin data.")
 
     table_map = {
-        "users": "user_profiles", # Deleting a user in admin should target user_profiles
+        "users": "user_profiles",
         "companies": "companies",
         "issuances": "share_issuances",
         "shareholders": "shareholders",
@@ -291,43 +282,27 @@ async def delete_admin_data(entity: str, item_id: str): # Changed item_id to str
         raise HTTPException(status_code=404, detail="Entity not found.")
 
     try:
-        # Before deleting a company, delete associated issuances, shareholders, and share classes
         if entity == "companies":
-            # Delete issuances associated with the company
             supabase.from_("share_issuances").delete().eq("company_id", item_id).execute()
-            # Delete shareholders associated with the company
             supabase.from_("shareholders").delete().eq("company_id", item_id).execute()
-            # Delete share classes associated with the company
             supabase.from_("share_classes").delete().eq("company_id", item_id).execute()
         elif entity == "users":
-            # For users, delete the profile first. The auth.users record cannot be deleted from client-side.
-            # The backend can delete auth.users records using the admin client.
             supabase.from_("user_profiles").delete().eq("id", item_id).execute()
-            # Also delete user's companies, which will cascade to other related data
             companies_to_delete_response = supabase.from_("companies").select('id').eq('user_id', item_id).execute()
-            for company in companies_to_delete_response.data:
-                # Recursively call delete for company
-                # Note: This recursive call will handle issuances, shareholders, shareclasses for each company
+            for company in companies_to_to_delete_response.data:
                 await delete_admin_data("companies", company['id'])
             
-            # Finally, delete the user from auth.users using the admin client
             supabase.auth.admin.delete_user(item_id)
 
-
-        # Delete the main item if it's not a special case handled above
-        if entity != "users": # Users handled above
+        if entity != "users":
             response = supabase.from_(table_map[entity]).delete().eq("id", item_id).execute()
 
-            # Supabase delete operation doesn't directly return affected rows in the same way as a typical DB.
-            # Check if an error occurred in the response.
             if response.data is None and response.count == 0:
                 raise HTTPException(status_code=404, detail=f"No {entity} found with ID {item_id} to delete.")
 
         return {"message": f"{entity.capitalize()} with ID {item_id} deleted successfully."}
     except Exception as e:
-        # Supabase client errors might be in response.error
         error_detail = str(e)
-        # Ensure 'response' exists before trying to access its 'error' attribute
         if 'response' in locals() and hasattr(response, 'error') and response.error:
             error_detail = response.error.message
         print(f"Error deleting admin data for {entity} (ID: {item_id}): {e}")
@@ -345,23 +320,19 @@ async def notify_shareholders(payload: EmailNotificationPayload):
         company_id = payload.company_id
         shareholder_ids = payload.shareholder_ids
 
-        # Fetch company details
         company_response = supabase.from_('companies').select('*').eq('id', company_id).single().execute()
         company = company_response.data
         if not company:
             raise HTTPException(status_code=404, detail="Company not found.")
 
-        # Fetch selected shareholders
         shareholders_response = supabase.from_('shareholders').select('*').in_('id', shareholder_ids).execute()
         selected_shareholders = shareholders_response.data
         if not selected_shareholders:
             raise HTTPException(status_code=404, detail="No selected shareholders found.")
 
-        # Fetch all share classes for the company
         share_classes_response = supabase.from_('share_classes').select('*').eq('company_id', company_id).execute()
         share_classes_map = {sc['id']: sc['name'] for sc in share_classes_response.data}
 
-        # Fetch all issuances for the company
         issuances_response = supabase.from_('share_issuances').select('*').eq('company_id', company_id).execute()
         all_issuances = issuances_response.data
 
@@ -371,13 +342,11 @@ async def notify_shareholders(payload: EmailNotificationPayload):
                 print(f"Skipping email for shareholder {shareholder['name']} (ID: {shareholder['id']}) - no email address provided.")
                 continue
 
-            # Filter issuances for the current shareholder
             shareholder_issuances = [
                 iss for iss in all_issuances
                 if iss['shareholder_id'] == shareholder['id']
             ]
 
-            # Prepare data for template
             issuances_html = ""
             if shareholder_issuances:
                 for iss in shareholder_issuances:
@@ -398,17 +367,27 @@ async def notify_shareholders(payload: EmailNotificationPayload):
                 "shareholder_name": shareholder['name'],
                 "company_name": company['name'],
                 "issuances_list_html": f"<ul>{issuances_html}</ul>",
-                "contact_email": "support@kapitalized.com", # Example contact email
-                "current_year": datetime.now().year # Added current year for footer
+                "contact_email": "support@kapitalized.com",
+                "current_year": datetime.now().year
             }
 
             email_subject = f"Your Shareholding Summary in {company['name']}"
             
-            # Load and render template
-            html_content = load_email_template("shareholder_notification", template_context)
-            
-            send_shareholder_email(shareholder['email'], email_subject, html_content)
-            emails_sent_count += 1
+            try:
+                html_content = load_email_template("shareholder_notification", template_context)
+                
+                send_result = send_shareholder_email(shareholder['email'], email_subject, html_content)
+                if send_result and send_result.get("status") == "success":
+                    emails_sent_count += 1
+                else:
+                    print(f"Email sending failed for {shareholder['email']}: {send_result.get('message', 'Unknown error')}")
+
+            except HTTPException as e:
+                print(f"Error sending email to {shareholder['email']}: {e.detail}")
+                raise e
+            except Exception as e:
+                print(f"Error sending email to {shareholder['email']}: {e}")
+                raise HTTPException(status_code=500, detail=f"An internal error occurred while processing email for {shareholder['email']}: {e}")
 
         return {"message": f"Email notifications initiated for {emails_sent_count} shareholders."}
 
