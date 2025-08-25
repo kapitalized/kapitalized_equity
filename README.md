@@ -3,6 +3,8 @@
 **Project Overview**
 The Kapitalized Equity Management app is a web application designed to help companies track equity, manage cap tables, and perform scenario planning. It's built as a full-stack application with a React frontend and a Python FastAPI backend hosted on Vercel. The data is stored in a Supabase database.
 
+This is useful for early-stage ventures, investors and other companies raising capital.
+
 **Frontend (React)**
 The frontend is a single-page application built with React, as indicated by package.json. The core logic is in src/App.js.
 
