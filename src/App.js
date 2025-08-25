@@ -3437,7 +3437,7 @@ const EquityManagementApp = () => {
                         <input
                           type="number"
                           value={futureIssuanceData.shares}
-                          onChange={(e) => setFutureIssuanceData({...futureIssuancesData, shares: e.target.value})}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shares: e.target.value})}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           min="1"
