@@ -1,31 +1,19 @@
-from flask import Flask, jsonify
-from supabase import create_client
-import os
+import React from 'react';
+import ReactDOM from 'react-dom';
+import App from './App';
+import reportWebVitals from './reportWebVitals';
+import { BrowserRouter } from 'react-router-dom';
 
-# Initialize Flask app
-app = Flask(__name__)
+ReactDOM.render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>,
+  document.getElementById('root')
+);
 
-# Supabase configuration (replace with your URL and key)
-supabase_url = os.environ.get("SUPABASE_URL")
-supabase_key = os.environ.get("SUPABASE_KEY")
-supabase = create_client(supabase_url, supabase_key)
-print("Supabase client initialized in Flask backend.")
-
-@app.route('/api/companies', methods=['GET'])
-def get_companies():
-    try:
-        response = supabase.table('companies').select('*').execute()
-        return jsonify(response.data), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/shareholders/<int:company_id>', methods=['GET'])
-def get_shareholders(company_id):
-    try:
-        response = supabase.table('shareholders').select('*').eq('company_id', company_id).execute()
-        return jsonify(response.data), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+// If you want to start measuring performance in your app, pass a function
+// to log results (for example: reportWebVitals(console.log))
+// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+reportWebVitals();
