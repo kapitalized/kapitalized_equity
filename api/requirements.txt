@@ -1,6 +1,6 @@
-supabase
-pandas
-fastapi
 uvicorn[standard]
 pydantic
+flask
+supabase
+pandas
 sib-api-v3-sdk
