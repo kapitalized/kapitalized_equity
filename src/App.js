@@ -8,7 +8,7 @@ import ShareholderForm from './ShareholderForm';
 import Modal from './Modal';
 import Dashboard from './Dashboard';
 
-// Date stamp for the last update to this file: 202508260613
+// Date stamp for the last update to this file: 202508260625
 const WOOCOMMERCE_SUBSCRIPTION_URL = "https://your-wordpress-site.com/product/your-subscription-product/";
 
 const theme = {
@@ -434,8 +434,8 @@ const EquityManagementApp = () => {
                       </div>
                     ))}
                   </div>
-                  {showCreateCompany && <Modal onClose={() => setShowCreateCompany(false)}><CompanyForm onSubmit={createCompany} onCancel={() => setShowCreateCompany(false)} /></Modal>}
-                  {showEditCompany && editingCompanyData && <Modal onClose={() => setShowEditCompany(false)}><CompanyForm onSubmit={(data) => updateCompany(editingCompanyData.id, data)} onCancel={() => setShowEditCompany(false)} initialData={editingCompanyData} /></Modal>}
+                  {showCreateCompany && <Modal onClose={() => setShowCreateCompany(false)}><CompanyForm onSubmit={createCompany} onCancel={() => setShowCreateCompany(false)} initialData={null} countryData={countryData} /></Modal>}
+                  {showEditCompany && editingCompanyData && <Modal onClose={() => setShowEditCompany(false)}><CompanyForm onSubmit={(data) => updateCompany(editingCompanyData.id, data)} onCancel={() => setShowEditCompany(false)} initialData={editingCompanyData} countryData={countryData} /></Modal>}
                   {showConfirmDeleteModal && (
                     <Modal onClose={() => setShowConfirmDeleteModal(false)}>
                       <div>
