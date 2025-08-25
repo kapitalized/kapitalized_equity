@@ -5,7 +5,7 @@ import './App.css';
 
 const Home = () => {
   const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] === useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCompanies = async () => {
