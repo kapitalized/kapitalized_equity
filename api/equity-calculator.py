@@ -24,7 +24,12 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     print("CRITICAL: Supabase environment variables not set.")
     supabase = None
 else:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("Supabase client initialized in FastAPI backend.")
+    except Exception as e:
+        print(f"CRITICAL: Failed to initialize Supabase client in FastAPI: {e}")
+        supabase = None # Ensure supabase is None if initialization fails
 
 # --- Pydantic Models for Data Validation ---
 # These models ensure that the data sent from the frontend is in the correct format.
@@ -136,7 +141,7 @@ def send_shareholder_email(to_email: str, subject: str, html_body: str):
         to=[{"email": to_email}],
         subject=subject,
         html_content=html_body,
-        sender={"name": "Kapitalized", "email": "hello@kapitalized.com"} # IMPORTANT: Replace with your verified sender email in Brevo
+        sender={"name": "Kapitalized", "email": "no-reply@kapitalized.com"} # IMPORTANT: Replace with your verified sender email in Brevo
     )
 
     try:
@@ -175,9 +180,22 @@ def load_email_template(template_name: str, context: dict) -> str:
 
 # --- API Endpoints ---
 
+# Health Check Endpoint
+@app.get("/api/health")
+async def health_check():
+    """
+    A simple health check endpoint to verify the FastAPI backend is running.
+    """
+    if supabase is None:
+        return {"status": "error", "message": "FastAPI backend is running, but Supabase client failed to initialize."}
+    return {"status": "ok", "message": "FastAPI backend is running and Supabase client initialized."}
+
+
 @app.post("/api/equity-calculator")
 async def get_equity_calculation(payload: CalculationPayload):
     """Endpoint to calculate current and future equity scenarios."""
+    if supabase is None:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized. Cannot perform equity calculations.")
     try:
         current_issuances_dict = [issuance.dict() for issuance in payload.currentIssuances]
         shareholders_dict = [sh.dict() for sh in payload.shareholders]
@@ -212,13 +230,14 @@ async def get_equity_calculation(payload: CalculationPayload):
         return {"current_state": current_state, "future_state": future_state}
 
     except Exception as e:
+        print(f"Error in equity-calculator endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"An error occurred during calculation: {e}")
 
 @app.get("/api/admin/{entity}")
 async def get_admin_data(entity: str):
     """Endpoint to fetch all data for the admin panel."""
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+        raise HTTPException(status_code=500, detail="Supabase client not initialized. Cannot fetch admin data.")
 
     table_map = {
         "users": "user_profiles",
@@ -259,7 +278,7 @@ async def get_admin_data(entity: str):
 async def delete_admin_data(entity: str, item_id: str): # Changed item_id to str for UUIDs
     """Endpoint to delete data from the admin panel."""
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+        raise HTTPException(status_code=500, detail="Supabase client not initialized. Cannot delete admin data.")
 
     table_map = {
         "users": "user_profiles", # Deleting a user in admin should target user_profiles
@@ -311,6 +330,7 @@ async def delete_admin_data(entity: str, item_id: str): # Changed item_id to str
         # Ensure 'response' exists before trying to access its 'error' attribute
         if 'response' in locals() and hasattr(response, 'error') and response.error:
             error_detail = response.error.message
+        print(f"Error deleting admin data for {entity} (ID: {item_id}): {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete {entity}: {error_detail}")
 
 @app.post("/api/notify-shareholders")
@@ -319,7 +339,7 @@ async def notify_shareholders(payload: EmailNotificationPayload):
     Endpoint to send email notifications to selected shareholders.
     """
     if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase client not initialized.")
+        raise HTTPException(status_code=500, detail="Supabase client not initialized. Cannot send email notifications.")
 
     try:
         company_id = payload.company_id
