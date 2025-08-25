@@ -804,7 +804,7 @@ const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError, se
   const companiesTableColumns = [
     { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
     { key: 'description', header: 'Description', isSortable: true },
-    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || ''}, ${row.address.state}, ${row.address.country}` : 'N/A' },
+    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || ''} ${row.address.state}, ${row.address.country}` : 'N/A' },
   ];
 
   return (
@@ -1657,7 +1657,7 @@ const EquityManagementApp = () => {
         address: profileData.address,
         username: profileData.username,
       };
-      const { data, error } = await window.supabaseClient
+      const { error } = await window.supabaseClient
         .from('user_profiles')
         .upsert({ id: user.id, ...dataToUpdate }, { onConflict: 'id' });
 
@@ -1701,7 +1701,7 @@ const EquityManagementApp = () => {
     }
 
     try {
-      const { data, error } = await window.supabaseClient.auth.updateUser({ email: newEmail });
+      const { error } = await window.supabaseClient.auth.updateUser({ email: newEmail });
 
       if (error) throw error;
       
@@ -1782,7 +1782,7 @@ const EquityManagementApp = () => {
         const cleanLocalPart = localPart.split('+')[0];
         const newEmail = `${cleanLocalPart}+inactive-${timestamp}@${domain}`;
 
-        const { data: authUpdateData, error: authUpdateError } = await window.supabaseClient.auth.updateUser({
+        const { error: authUpdateError } = await window.supabaseClient.auth.updateUser({
             email: newEmail,
         });
 
@@ -2029,7 +2029,7 @@ const EquityManagementApp = () => {
       setEditingShareholderData(shareholderToEdit);
       setShowEditShareholder(true);
     } else {
-      addError("Shareholder with ID ${shareholderId} not found for editing.");
+      addError(`Shareholder with ID ${shareholderId} not found for editing.`);
     }
   };
 
@@ -2157,7 +2157,7 @@ const EquityManagementApp = () => {
     const classSummary = _(companyIssuances)
       .groupBy('share_class_id')
       .map((issuances, shareClassId) => {
-        const shareClass = shareClasses.find(sc => sc.id == shareClassId);
+        const shareClass = shareClasses.find(sc => sc.id === parseInt(shareClassId));
         const totalShares = _.sumBy(issuances, 'shares');
         const totalValue = _.sumBy(issuances, i => i.shares * i.price_per_share);
         const issuanceRound = issuances[0]?.round || 'N/A'; // Use round number here
@@ -2199,7 +2199,7 @@ const EquityManagementApp = () => {
     const shareholderSummary = _(companyIssuances)
       .groupBy('shareholder_id')
       .map((issuances, shareholderId) => {
-        const shareholder = allCompanyShareholders.find(s => s.id == shareholderId);
+        const shareholder = allCompanyShareholders.find(s => s.id === parseInt(shareholderId));
         const totalShares = _.sumBy(issuances, 'shares');
         const totalValue = _.sumBy(issuances, i => i.shares * i.price_per_share);
 
@@ -2223,7 +2223,7 @@ const EquityManagementApp = () => {
 
     // Add shareholders with no issuances (only if they are not already in the summary)
     const shareholdersWithNoIssuances = allCompanyShareholders.filter(sh =>
-      !shareholderSummary.some(summary => summary.id == sh.id)
+      !shareholderSummary.some(summary => summary.id === sh.id)
     ).map(sh => ({
       id: sh.id,
       name: sh.name,
@@ -2635,7 +2635,6 @@ const EquityManagementApp = () => {
   // These are now correctly defined within the component scope.
   const currentEquityDataExclOptions = getEquityDataForRound('current', true); // Current view excluding options
   const currentEquityDataInclOptions = getEquityDataForRound('current', false); // Current view including options
-  const displayEquityDataExclOptions = selectedRound === 'current' ? currentEquityDataExclOptions : getEquityDataForRound(selectedRound, true);
   const displayEquityDataInclOptions = selectedRound === 'current' ? currentEquityDataInclOptions : getEquityDataForRound(selectedRound, false);
 
 
@@ -2701,13 +2700,6 @@ const EquityManagementApp = () => {
     { key: 'currentPercentage', header: 'Current Shareholding %', isSortable: true, render: (row) => `${row.currentPercentage.toFixed(2)}%` },
     { key: 'futurePercentage', header: 'Future Shareholding %', isSortable: true, render: (row) => `${row.futurePercentage.toFixed(2)}%` },
     { key: 'percentageChange', header: '% Change', isSortable: true, render: (row) => <span style={{ color: row.percentageChange > 0 ? 'green' : 'red' }}>{row.percentageChange.toFixed(2)}%</span> },
-  ];
-
-  // Columns for Companies table (new)
-  const companiesTableColumns = [
-    { key: 'name', header: 'Company Name', isSortable: true, render: (row) => <span className="font-medium" style={{ color: theme.text }}>{row.name}</span> },
-    { key: 'description', header: 'Description', isSortable: true },
-    { key: 'address', header: 'Address', isSortable: false, render: (row) => row.address ? `${row.address.line1}, ${row.address.city || '', row.address.state}, ${row.address.country}` : 'N/A' },
   ];
 
 
@@ -3059,7 +3051,7 @@ const EquityManagementApp = () => {
                     id="company-select"
                     value={selectedCompany?.id || ''}
                     onChange={(e) => {
-                      const company = companies.find(c => c.id == e.target.value);
+                      const company = companies.find(c => c.id === parseInt(e.target.value, 10));
                       setSelectedCompany(company);
                     }}
                     className="px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
