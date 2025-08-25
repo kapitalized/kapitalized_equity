@@ -1,16 +1,17 @@
 {
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/equity-calculator.py"
-    }
-  ],
-  "functions": {
-    "api/equity-calculator.py": {
+      "src": "api/equity-calculator.py",
       "use": "@vercel/python",
       "config": {
-        "runtime": "python3.9"
+        "pythonVersion": "3.9"
       }
     }
-  }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/equity-calculator.py"
+    }
+  ]
 }
