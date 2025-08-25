@@ -1,6 +1,6 @@
-uvicorn[standard]
-pydantic
 flask
 supabase
 pandas
+python-dotenv
+requests
 sib-api-v3-sdk
