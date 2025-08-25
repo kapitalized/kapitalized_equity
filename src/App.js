@@ -12,7 +12,7 @@ const Home = () => {
     const fetchCompanies = async () => {
       try {
         const response = await axios.get('/api/companies');
-        setCompanies(response.data);
+        setCompanies(response.data.data || response.data);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching companies:', error);
@@ -25,6 +25,7 @@ const Home = () => {
 
   if (loading) return <div className="text-center p-4">Loading...</div>;
   if (error) return <div className="text-center p-4 text-red-500">{error}</div>;
+  if (!companies.length) return <div className="text-center p-4">No companies found.</div>;
 
   return (
     <div className="container mx-auto p-4">
@@ -47,7 +48,7 @@ const CompanyDetail = ({ match }) => {
     const fetchShareholders = async () => {
       try {
         const response = await axios.get(`/api/shareholders/${match.params.id}`);
-        setShareholders(response.data);
+        setShareholders(response.data.data || response.data);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching shareholders:', error);
@@ -60,6 +61,7 @@ const CompanyDetail = ({ match }) => {
 
   if (loading) return <div className="text-center p-4">Loading...</div>;
   if (error) return <div className="text-center p-4 text-red-500">{error}</div>;
+  if (!shareholders.length) return <div className="text-center p-4">No shareholders found.</div>;
 
   return (
     <div className="container mx-auto p-4">
@@ -77,10 +79,10 @@ const App = () => {
   return (
     <Router>
       <div className="App">
-      <Routes>
-        <Route exact path="/" element={<Home />} />
-        <Route path="/company/:id" element={<CompanyDetail />} />
-      </Routes>
+        <Routes>
+          <Route exact path="/" element={<Home />} />
+          <Route path="/company/:id" element={<CompanyDetail />} />
+        </Routes>
       </div>
     </Router>
   );
