@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/equity-calculator.py"
+    }
+  ],
+  "functions": {
+    "api/equity-calculator.py": {
+      "runtime": "python3.9"
+    }
+  }
+}
