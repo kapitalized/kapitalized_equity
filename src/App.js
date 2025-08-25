@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown, Mail } from 'lucide-react'; // Added Mail icon
-import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 
 // Date stamp for the last update to this file: 202508241730
@@ -53,16 +53,6 @@ const countryData = {
   "United States": ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"],
   "Canada": ["Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", "Nova Scotia", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan"]
 };
-
-// --- Share Types List (for Share Classes) ---
-const SHARE_TYPES = [
-  'Common',
-  'Preference Participating',
-  'Preference Non-Participating',
-  'Convertible',
-  'Options',
-  'Other'
-];
 
 // --- Shareholder Types List (for Shareholders) ---
 const SHAREHOLDER_TYPES = [
@@ -333,137 +323,6 @@ const ShareClassForm = ({ onSubmit, onCancel }) => {
           className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
         >
           Create Class
-        </button>
-      </div>
-    </form>
-  );
-};
-
-// IssuanceForm Component
-const IssuanceForm = ({ shareholders, shareClasses, onSubmit, onCancel, initialData = {} }) => {
-  const [data, setData] = useState({
-    roundNumber: initialData.round || '', // Use round for roundNumber
-    roundTitle: initialData.round_description || '', // Use round_description for roundTitle
-    shareholderId: initialData.shareholder_id || '',
-    shareClassId: initialData.share_class_id || '',
-    shares: initialData.shares || '',
-    pricePerShare: initialData.price_per_share || '',
-    issueDate: new Date().toISOString().split('T')[0],
-    payment_status: initialData.payment_status || 'No',
-  });
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(data);
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <h3 className="text-lg font-bold mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Record Share Issuance</h3>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Round Number</label>
-          <input
-            type="number"
-            value={data.roundNumber}
-            onChange={(e) => setData({...data, roundNumber: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            min="1"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Round Title (e.g., Seed, Series A)</label>
-          <input
-            type="text"
-            value={data.roundTitle}
-            onChange={(e) => setData({...data, roundTitle: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            maxLength="30"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Shareholder</label>
-          <select
-            value={data.shareholderId}
-            onChange={(e) => setData({...data, shareholderId: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          >
-            <option value="">Select Shareholder</option>
-            {shareholders.map(shareholder => (
-              <option key={shareholder.id} value={shareholder.id}>{shareholder.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Share Class</label>
-          <select
-            value={data.shareClassId}
-            onChange={(e) => setData({...data, shareClassId: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          >
-            <option value="">Select Share Class</option>
-            {shareClasses.map(shareClass => (
-              <option key={shareClass.id} value={shareClass.id}>{shareClass.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Number of Shares</label>
-          <input
-            type="number"
-            value={data.shares}
-            onChange={(e) => setData({...data, shares: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            min="1"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Price per Share ($)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={data.pricePerShare}
-            onChange={(e) => setData({...data, pricePerShare: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            min="0"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
-          <input
-            type="date"
-            value={data.issueDate}
-            onChange={(e) => setData({...data, issueDate: e.target.value})}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-        </div>
-        <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Shares have been paid for?</label>
-            <select value={data.payment_status} onChange={(e) => setData({...data, payment_status: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md" required>
-                <option>Yes</option>
-                <option>Partial</option>
-                <option>No</option>
-            </select>
-        </div>
-      </div>
-      <div className="flex justify-end space-x-2 mt-6">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-        >
-          Record Issuance
         </button>
       </div>
     </form>
@@ -939,45 +798,6 @@ const LoginDetailsForm = ({ userEmail, onPasswordChange, onEmailChange, onDeacti
   );
 };
 
-// SubscriptionPage Component
-const SubscriptionPage = ({ userProfile, handleCheckout, loading, addError }) => {
-  const isPremiumUser = userProfile?.subscription_status === 'active';
-
-  return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>Subscription Status</h2>
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Your Current Plan</h3>
-        <p className="text-2xl font-bold" style={{color: isPremiumUser ? theme.secondary : theme.primary}}>
-            {isPremiumUser ? 'Premium Plan' : 'Free Plan'}
-        </p>
-        <p className="text-sm" style={{ color: theme.lightText }}>
-            {isPremiumUser ? 'You have access to all premium features.' : 'Your current access is limited to basic features.'}
-        </p>
-      </div>
-      {!isPremiumUser && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-bold text-gray-900 mb-2" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700 }}>Upgrade to Premium</h3>
-          <p className="text-sm" style={{ color: theme.lightText }}>
-              Unlock advanced reports, scenario planning, and unlimited company management.
-          </p>
-          <button
-            onClick={handleCheckout}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition duration-200 flex items-center justify-center text-lg font-semibold"
-            disabled={loading}
-          >
-            {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
-            Upgrade Now
-          </button>
-          <p className="text-sm" style={{ color: theme.lightText }}>
-            You will be redirected to your WooCommerce site to complete the subscription.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-};
-
 // New CompaniesPage Component
 const CompaniesPage = ({ companies, onEditCompany, onDeleteCompany, addError, setShowCreateCompany }) => {
   // Columns for Companies table (new)
@@ -1177,6 +997,38 @@ const AdminApp = () => {
     // You could add a local state here to display admin-specific errors
   };
 
+  const fetchAllAdminData = useCallback(async () => {
+    setLoadingAdminData(true);
+    try {
+      console.log("Admin: Fetching users data...");
+      const usersResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/users`);
+      if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
+      const usersData = await usersResponse.json();
+      console.log("Admin: Fetched users data:", usersData);
+      setAllUsers(usersData);
+
+      console.log("Admin: Fetching companies data...");
+      const companiesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/companies`);
+      if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
+      const companiesData = await companiesResponse.json();
+      console.log("Admin: Fetched companies data:", companiesData);
+      setAllCompanies(companiesData);
+
+      console.log("Admin: Fetching issuances data...");
+      const issuancesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/issuances`);
+      if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
+      const issuancesData = await issuancesResponse.json();
+      console.log("Admin: Fetched issuances data:", issuancesData);
+      setAllIssuances(issuancesData);
+
+    } catch (error) {
+      console.error("Admin: Error fetching admin data:", error);
+      addError('Failed to fetch admin data: ' + error.message);
+    } finally {
+      setLoadingAdminData(false);
+    }
+  }, []);
+
   useEffect(() => {
     const initAdminAuth = async () => {
       // Wait for the global supabaseClient to be available
@@ -1224,40 +1076,8 @@ const AdminApp = () => {
     };
 
     initAdminAuth();
-  }, []); // Empty dependency array means this runs once on mount
+  }, [fetchAllAdminData]); // Empty dependency array means this runs once on mount
 
-
-  const fetchAllAdminData = async () => {
-    setLoadingAdminData(true);
-    try {
-      console.log("Admin: Fetching users data...");
-      const usersResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/users`);
-      if (!usersResponse.ok) throw new Error(`HTTP error fetching users! status: ${usersResponse.status}`);
-      const usersData = await usersResponse.json();
-      console.log("Admin: Fetched users data:", usersData);
-      setAllUsers(usersData);
-
-      console.log("Admin: Fetching companies data...");
-      const companiesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/companies`);
-      if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
-      const companiesData = await companiesResponse.json();
-      console.log("Admin: Fetched companies data:", companiesData);
-      setAllCompanies(companiesData);
-
-      console.log("Admin: Fetching issuances data...");
-      const issuancesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/issuances`);
-      if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
-      const issuancesData = await issuancesResponse.json();
-      console.log("Admin: Fetched issuances data:", issuancesData);
-      setAllIssuances(issuancesData);
-
-    } catch (error) {
-      console.error("Admin: Error fetching admin data:", error);
-      addError('Failed to fetch admin data: ' + error.message);
-    } finally {
-      setLoadingAdminData(false);
-    }
-  };
 
   const handleAdminDelete = async (id, type) => {
     setAdminConfirmModalDetails({
@@ -1469,7 +1289,6 @@ const AdminApp = () => {
 
 
 const EquityManagementApp = () => {
-  const dashboardRef = useRef();
   const pieChartRef = useRef();
 
   const [user, setUser] = useState(null);
@@ -1499,7 +1318,6 @@ const EquityManagementApp = () => {
 
   const [showCreateShareClass, setShowCreateShareClass] = useState(false);
   const [showCreateIssuance, setShowCreateIssuance] = useState(false);
-  const [showBulkAddIssuance, setShowBulkAddIssuance] = useState(false);
   const [showBulkAddShareholder, setShowBulkAddShareholder] = useState(false);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false);
@@ -2275,7 +2093,6 @@ const EquityManagementApp = () => {
       if (error) throw error;
       setShareIssuances([...shareIssuances, newIssuance]);
       setShowCreateIssuance(false);
-      setShowBulkAddIssuance(false);
     } catch (error) {
       addError('Error creating issuance: ' + error.message);
     } finally {
@@ -2875,7 +2692,7 @@ const EquityManagementApp = () => {
   const reportShareholderHoldingsColumnsInclOptions = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'totalShares', header: 'Shares', isSummable: true, isSortable: true, render: (row) => row.totalShares.toLocaleString() },
-    { key: 'totalValue', header: 'Value', isSummable: true, isSortable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+    { key: 'totalValue', header: 'Value', isSummable: true, isSummable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
     { key: 'percentage', header: 'Percentage', isSortable: true, render: (row) => `${((row.totalShares / (companyDataInclOptions.totalShares || 1)) * 100).toFixed(2)}%` },
   ];
 
@@ -3607,7 +3424,7 @@ const EquityManagementApp = () => {
                           type="number"
                           value={futureIssuanceData.shares}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shares: e.target.value})}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           min="1"
                           required
@@ -3620,7 +3437,7 @@ const EquityManagementApp = () => {
                           step="0.01"
                           value={futureIssuanceData.pricePerShare}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, pricePerShare: e.target.value})}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           min="0"
                           required
@@ -3632,7 +3449,7 @@ const EquityManagementApp = () => {
                           type="date"
                           value={futureIssuanceData.issueDate}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, issueDate: e.target.value})}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           required
                         />
@@ -3643,7 +3460,7 @@ const EquityManagementApp = () => {
                           type="number"
                           value={futureIssuanceData.roundNumber}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, roundNumber: e.target.value})}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           min="1"
                           required
@@ -3655,7 +3472,7 @@ const EquityManagementApp = () => {
                           type="text"
                           value={futureIssuanceData.roundTitle}
                           onChange={(e) => setFutureIssuanceData({...futureIssuanceData, roundTitle: e.target.value})}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           maxLength="30"
                         />
