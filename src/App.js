@@ -2633,7 +2633,6 @@ const EquityManagementApp = () => {
 
   // Define displayEquityData and currentEquityData after companyDataExclOptions and companyDataInclOptions
   // These are now correctly defined within the component scope.
-  const currentEquityDataExclOptions = getEquityDataForRound('current', true); // Current view excluding options
   const currentEquityDataInclOptions = getEquityDataForRound('current', false); // Current view including options
   const displayEquityDataInclOptions = selectedRound === 'current' ? currentEquityDataInclOptions : getEquityDataForRound(selectedRound, false);
 
@@ -2666,7 +2665,7 @@ const EquityManagementApp = () => {
     { key: 'share_class_name', header: 'Share Class', isSortable: true },
     { key: 'shares', header: 'Shares', isSortable: true, isSummable: true, render: (row) => row.shares.toLocaleString() },
     { key: 'price_per_share', header: 'Price/Share', isSortable: true, render: (row) => `$${row.price_per_share.toFixed(2)}` },
-    { key: 'total_value', header: 'Total Value', isSortable: true, isSummable: true, render: (row) => `$${row.total_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+    { key: 'total_value', header: 'Total Value', isSortable: true, render: (row) => `$${row.total_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
   ];
 
   // Columns for Share Classes table (in Equity Home)
@@ -2690,7 +2689,7 @@ const EquityManagementApp = () => {
   const reportShareholderHoldingsColumnsInclOptions = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'totalShares', header: 'Shares', isSummable: true, isSortable: true, render: (row) => row.totalShares.toLocaleString() },
-    { key: 'totalValue', header: 'Value', isSummable: true, isSummable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
+    { key: 'totalValue', header: 'Value', isSummable: true, isSortable: true, render: (row) => `$${row.totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` },
     { key: 'percentage', header: 'Percentage', isSortable: true, render: (row) => `${((row.totalShares / (companyDataInclOptions.totalShares || 1)) * 100).toFixed(2)}%` },
   ];
 
