@@ -1,4 +1,7 @@
-const CompanyForm = ({ onSubmit, onCancel, initialData = {} }) => {
+import React, { useState } from 'react';
+import AddressForm from './AddressForm';
+
+const CompanyForm = ({ onSubmit, onCancel, initialData = {}, countryData }) => {
   const [data, setData] = useState({
     name: initialData.name || '',
     description: initialData.description || '',
@@ -24,7 +27,7 @@ const CompanyForm = ({ onSubmit, onCancel, initialData = {} }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea value={data.description} onChange={(e) => setData({...data, description: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" />
         </div>
-        <AddressForm initialAddress={data.address} onAddressChange={handleAddressChange} />
+        <AddressForm initialAddress={data.address} onAddressChange={handleAddressChange} countryData={countryData} />
       </div>
       <div className="flex justify-end space-x-2 mt-6">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</button>
