@@ -1,17 +1,14 @@
 {
   "builds": [
     {
-      "src": "api/equity-calculator.py",
-      "use": "@vercel/python",
-      "config": {
-        "pythonVersion": "3.9"
-      }
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/equity-calculator.py"
+      "dest": "/api/index.py"
     }
   ]
 }
