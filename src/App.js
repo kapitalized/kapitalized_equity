@@ -13,7 +13,6 @@ const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
 const ADMIN_BACKEND_BASE_URL = "/api/admin";
 // IMPORTANT: Base URL for shareholder notification API
 const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
-const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
 
 
 // IMPORTANT: Replace with your WooCommerce Subscription Product URL
