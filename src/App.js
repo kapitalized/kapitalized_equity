@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, LogOut, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown, Mail } from 'lucide-react'; // Added Mail icon
+import { PlusCircle, Upload, BarChart3, Users, Building2, Trash2, Edit, User, Loader2, Download, ChevronDown, ChevronLeft, ChevronRight, Settings, CreditCard, Search, XCircle, ArrowUp, ArrowDown, Mail } from 'lucide-react'; // Added Mail icon
 import { Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import _ from 'lodash';
 import { theme, countryData, SHAREHOLDER_TYPES, EXCLUDED_SHARE_TYPES } from './styles';
