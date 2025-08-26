@@ -9,6 +9,8 @@ import { AdminApp, AdminLogin } from './AdminApp';
 // Date stamp for the last update to this file: 202508241730
 // IMPORTANT: URL for the main equity calculation endpoint
 const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
+// IMPORTANT: Base URL for admin operations
+const ADMIN_BACKEND_BASE_URL = "/api/admin";
 // IMPORTANT: Base URL for shareholder notification API
 const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
 
