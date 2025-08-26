@@ -13,6 +13,7 @@ const EQUITY_CALCULATOR_BACKEND_URL = "/api/equity-calculator";
 const ADMIN_BACKEND_BASE_URL = "/api/admin";
 // IMPORTANT: Base URL for shareholder notification API
 const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
+const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
 
 
 // IMPORTANT: Replace with your WooCommerce Subscription Product URL
@@ -2207,49 +2208,56 @@ const EquityManagementApp = () => {
   };
 
   // New function to send email notifications
-  const sendShareholderNotifications = async () => {
-    if (!selectedCompany) {
-      addError("Please select a company first.");
-      return;
+const sendShareholderNotifications = async () => {
+  if (!selectedCompany) {
+    addError("Please select a company first.");
+    return;
+  }
+  if (selectedShareholdersForEmail.length === 0) {
+    addError("Please select at least one shareholder to notify.");
+    return;
+  }
+
+  setLoading(true);
+  setErrors([]);
+
+  try {
+    const payload = {
+      company_id: selectedCompany.id,
+      shareholder_ids: selectedShareholdersForEmail,
+    };
+
+    console.log('Sending notification payload:', payload); // Debug log
+
+    // Use the correct API endpoint URL
+    const response = await fetch('/api/notify-shareholders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    console.log('Response status:', response.status); // Debug log
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail || errorData.error || 'Unknown error'}`);
     }
-    if (selectedShareholdersForEmail.length === 0) {
-      addError("Please select at least one shareholder to notify.");
-      return;
-    }
 
-    setLoading(true);
-    setErrors([]);
+    const result = await response.json();
+    console.log('Success result:', result); // Debug log
+    
+    addError(result.message || 'Email notifications sent successfully!');
+    setSelectedShareholdersForEmail([]); // Clear selection after sending
 
-    try {
-      const payload = {
-        company_id: selectedCompany.id,
-        shareholder_ids: selectedShareholdersForEmail,
-      };
-
-      const response = await fetch(NOTIFICATION_BACKEND_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail || errorData.error}`);
-      }
-
-      const result = await response.json();
-      addError(result.message || 'Email notifications sent successfully!');
-      setSelectedShareholdersForEmail([]); // Clear selection after sending
-
-    } catch (error) {
-      console.error("Error sending shareholder notifications:", error);
-      addError('Failed to send email notifications: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error("Error sending shareholder notifications:", error);
+    addError('Failed to send email notifications: ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   // Get both filtered and unfiltered data
