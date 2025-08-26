@@ -629,4 +629,84 @@ def internal_error(error):
 
 # For Vercel
 if __name__ == '__main__':
+
+# Admin endpoints (add these to your existing code)
+@app.route('/api/admin/users', methods=['GET'])
+@verify_token  # Or remove this if you want to test without auth first
+def get_admin_users():
+    try:
+        # Get all users from user_profiles
+        response = supabase.table('user_profiles').select('*').execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/companies', methods=['GET'])
+def get_admin_companies():
+    try:
+        # Get all companies with related data
+        companies = supabase.table('companies').select('*').execute()
+        
+        # For each company, get counts
+        for company in companies.data:
+            company_id = company['id']
+            
+            # Get shareholder count
+            shareholders = supabase.table('shareholders').select('id').eq('company_id', company_id).execute()
+            company['shareholder_count'] = len(shareholders.data)
+            
+            # Get share issuance count
+            issuances = supabase.table('share_issuances').select('id').eq('company_id', company_id).execute()
+            company['issuance_count'] = len(issuances.data)
+        
+        return jsonify(companies.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/shareholders', methods=['GET'])
+def get_admin_shareholders():
+    try:
+        # Get all shareholders with company info
+        shareholders = supabase.table('shareholders').select('*, companies(name)').execute()
+        return jsonify(shareholders.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/share-issuances', methods=['GET'])
+def get_admin_share_issuances():
+    try:
+        # Get all share issuances with related info
+        issuances = supabase.table('share_issuances').select('*, companies(name), shareholders(name), share_classes(name)').execute()
+        return jsonify(issuances.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Admin delete endpoints
+@app.route('/api/admin/companies/<company_id>', methods=['DELETE'])
+@verify_token
+def delete_admin_company(company_id):
+    try:
+        # Delete all related data first (cascade)
+        supabase.table('share_issuances').delete().eq('company_id', company_id).execute()
+        supabase.table('shareholders').delete().eq('company_id', company_id).execute()
+        supabase.table('share_classes').delete().eq('company_id', company_id).execute()
+        
+        # Then delete company
+        response = supabase.table('companies').delete().eq('id', company_id).execute()
+        return jsonify({'message': 'Company and all related data deleted'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/shareholders/<shareholder_id>', methods=['DELETE'])
+@verify_token
+def delete_admin_shareholder(shareholder_id):
+    try:
+        # Delete related share issuances first
+        supabase.table('share_issuances').delete().eq('shareholder_id', shareholder_id).execute()
+        
+        # Then delete shareholder
+        response = supabase.table('shareholders').delete().eq('id', shareholder_id).execute()
+        return jsonify({'message': 'Shareholder deleted'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     app.run(debug=True, host='0.0.0.0', port=5000)
