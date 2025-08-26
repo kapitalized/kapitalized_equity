@@ -655,6 +655,15 @@ def get_admin_shareholders():
     except Exception as e:
         return jsonify({'error': str(e), 'message': 'Failed to fetch shareholders'}), 500
 
+@app.route('/api/admin/share-issuances', methods=['GET'])
+def get_admin_share_issuances():
+    try:
+        response = supabase.table('share_issuances').select('*').execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e), 'message': 'Failed to fetch share issuances'}), 500
+
+# Add this endpoint (the admin panel is looking for "issuances" not "share-issuances")
 @app.route('/api/admin/issuances', methods=['GET'])
 def get_admin_issuances_alias():
     try:
