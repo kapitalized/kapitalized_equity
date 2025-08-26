@@ -2206,7 +2206,7 @@ const EquityManagementApp = () => {
     }
   };
 
-  // New function to send email notifications
+// New function to send email notifications
 const sendShareholderNotifications = async () => {
   if (!selectedCompany) {
     addError("Please select a company first.");
@@ -2216,40 +2216,39 @@ const sendShareholderNotifications = async () => {
     addError("Please select at least one shareholder to notify.");
     return;
   }
-
+  
   setLoading(true);
   setErrors([]);
-
+  
   try {
     const payload = {
       company_id: selectedCompany.id,
       shareholder_ids: selectedShareholdersForEmail,
     };
-
+    
     console.log('Sending notification payload:', payload); // Debug log
-
-    // Use the correct API endpoint URL
-    const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
+    
+    const response = await fetch(NOTIFICATION_BACKEND_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
-
+    
     console.log('Response status:', response.status); // Debug log
-
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail || errorData.error || 'Unknown error'}`);
     }
-
+    
     const result = await response.json();
     console.log('Success result:', result); // Debug log
     
     addError(result.message || 'Email notifications sent successfully!');
     setSelectedShareholdersForEmail([]); // Clear selection after sending
-
+    
   } catch (error) {
     console.error("Error sending shareholder notifications:", error);
     addError('Failed to send email notifications: ' + error.message);
