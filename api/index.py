@@ -1,212 +1,407 @@
-from flask import Flask, jsonify, request
-from supabase import create_client
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 from datetime import datetime
+from supabase import create_client, Client
+from functools import wraps
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
+
+# Initialize Flask app
 app = Flask(__name__)
+CORS(app)
 
-supabase_url = os.environ.get("SUPABASE_URL", "https://hrlqnbzcjcmrpjwnoiby.supabase.co")
-supabase_key = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhybHFuYnpjamNtcnBqd25vaWJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTczODYsImV4cCI6MjA3MDk3MzM4Nn0.sOt8Gn2OpUn4dmwrBqzR2s9dzCn6GxqslRgZhlU7iiE")
+# Initialize Supabase client
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_ANON_KEY")
 
-def get_supabase():
-    token = request.headers.get('Authorization', '').split('Bearer ')[1] if request.headers.get('Authorization') else None
-    client = create_client(supabase_url, supabase_key)
-    if token:
-        client.auth.set_session(token, None)
-    return client
+if not supabase_url or not supabase_key:
+    print("Warning: Supabase credentials not found in environment variables")
+    supabase = None
+else:
+    supabase = create_client(supabase_url, supabase_key)
 
-# Companies, Shareholders, Share Classes (existing CRUD)
-@app.route('/api/companies', methods=['GET'])
-def get_companies():
-    client = get_supabase()
+# Helper function to verify auth token
+def verify_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization')
+        
+        if auth_header:
+            try:
+                token = auth_header.split(' ')[1]  # Bearer <token>
+            except IndexError:
+                return jsonify({'error': 'Invalid token format'}), 401
+        
+        if not token:
+            return jsonify({'error': 'Token missing'}), 401
+        
+        try:
+            # Verify token with Supabase
+            user = supabase.auth.get_user(token)
+            request.current_user = user
+        except Exception as e:
+            return jsonify({'error': 'Invalid token'}), 401
+        
+        return f(*args, **kwargs)
+    
+    return decorated_function
+
+# Health check endpoint
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'supabase_connected': supabase is not None
+    })
+
+# Test endpoint
+@app.route('/api/test', methods=['GET'])
+def test():
+    return jsonify({'message': 'API is working!'})
+
+# Authentication endpoints
+@app.route('/api/auth/signup', methods=['POST'])
+def signup():
     try:
-        user = client.auth.get_user()
-        response = client.table('companies').select('*').eq('user_id', user.user.id).execute()
-        return jsonify(response.data), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/companies', methods=['POST'])
-def create_company():
-    client = get_supabase()
-    data = request.json
-    try:
-        user = client.auth.get_user()
-        data['user_id'] = user.user.id
-        response = client.table('companies').insert(data).execute()
-        return jsonify(response.data[0]), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/companies/<int:id>', methods=['PUT'])
-def update_company(id):
-    client = get_supabase()
-    data = request.json
-    try:
-        user = client.auth.get_user()
-        response = client.table('companies').update(data).eq('id', id).eq('user_id', user.user.id).execute()
-        if not response.data:
-            return jsonify({"error": "Company not found or not authorized"}), 404
-        return jsonify(response.data[0]), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/companies/<int:id>', methods=['DELETE'])
-def delete_company(id):
-    client = get_supabase()
-    try:
-        user = client.auth.get_user()
-        response = client.table('companies').delete().eq('id', id).eq('user_id', user.user.id).execute()
-        if not response.data:
-            return jsonify({"error": "Company not found or not authorized"}), 404
-        return jsonify({"message": "Company deleted"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/shareholders/<int:company_id>', methods=['GET'])
-def get_shareholders(company_id):
-    client = get_supabase()
-    try:
-        user = client.auth.get_user()
-        company = client.table('companies').select('id').eq('id', company_id).eq('user_id', user.user.id).execute()
-        if not company.data:
-            return jsonify({"error": "Company not found or not authorized"}), 404
-        response = client.table('shareholders').select('*').eq('company_id', company_id).execute()
-        return jsonify(response.data), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/shareholders', methods=['POST'])
-def create_shareholder():
-    client = get_supabase()
-    data = request.json
-    try:
-        user = client.auth.get_user()
-        company = client.table('companies').select('id').eq('id', data['company_id']).eq('user_id', user.user.id).execute()
-        if not company.data:
-            return jsonify({"error": "Company not found or not authorized"}), 404
-        response = client.table('shareholders').insert(data).execute()
-        return jsonify(response.data[0]), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/shareholders/<int:id>', methods=['PUT'])
-def update_shareholder(id):
-    client = get_supabase()
-    data = request.json
-    try:
-        user = client.auth.get_user()
-        shareholder = client.table('shareholders').select('company_id').eq('id', id).single().execute()
-        if not shareholder.data:
-            return jsonify({"error": "Shareholder not found"}), 404
-        company = client.table('companies').select('id').eq('id', shareholder.data['company_id']).eq('user_id', user.user.id).execute()
-        if not company.data:
-            return jsonify({"error": "Not authorized"}), 404
-        response = client.table('shareholders').update(data).eq('id', id).execute()
-        return jsonify(response.data[0]), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/shareholders/<int:id>', methods=['DELETE'])
-def delete_shareholder(id):
-    client = get_supabase()
-    try:
-        user = client.auth.get_user()
-        shareholder = client.table('shareholders').select('company_id').eq('id', id).single().execute()
-        if not shareholder.data:
-            return jsonify({"error": "Shareholder not found"}), 404
-        company = client.table('companies').select('id').eq('id', shareholder.data['company_id']).eq('user_id', user.user.id).execute()
-        if not company.data:
-            return jsonify({"error": "Not authorized"}), 404
-        response = client.table('shareholders').delete().eq('id', id).execute()
-        return jsonify({"message": "Shareholder deleted"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/share_classes/<int:company_id>', methods=['GET'])
-def get_share_classes(company_id):
-    client = get_supabase()
-    try:
-        user = client.auth.get_user()
-        company = client.table('companies').select('id').eq('id', company_id).eq('user_id', user.user.id).execute()
-        if not company.data:
-            return jsonify({"error": "Company not found or not authorized"}), 404
-        response = client.table('share_classes').select('*').eq('company_id', company_id).execute()
-        return jsonify(response.data), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Equity Calculator Endpoint
-@app.route('/api/equity-calculator', methods=['POST'])
-def equity_calculator():
-    client = get_supabase()
-    data = request.json
-    try:
-        user = client.auth.get_user()
-        company_id = data.get('company_id')
-        company = client.table('companies').select('id').eq('id', company_id).eq('user_id', user.user.id).execute()
-        if not company.data:
-            return jsonify({"error": "Company not found or not authorized"}), 404
-
-        # Fetch all relevant data
-        shareholders = client.table('shareholders').select('*').eq('company_id', company_id).execute()
-        issuances = client.table('share_issuances').select('*').eq('company_id', company_id).execute()
-        share_classes = client.table('share_classes').select('*').eq('company_id', company_id).execute()
-
-        # Simple equity calculation (expand as needed)
-        equity_data = {}
-        for shareholder in shareholders.data:
-            total_shares = sum(i['shares'] for i in issuances.data if i['shareholder_id'] == shareholder['id'])
-            equity_data[shareholder['name']] = {
-                'shares': total_shares,
-                'percentage': (total_shares / sum(i['shares'] for i in issuances.data)) * 100 if issuances.data else 0
-            }
-
-        return jsonify({"equity_data": equity_data}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Admin Endpoint
-@app.route('/api/admin', methods=['POST'])
-def admin_login():
-    client = get_supabase()
-    data = request.json
-    try:
+        data = request.get_json()
         email = data.get('email')
         password = data.get('password')
-        {data: {user}, error} = client.auth.signInWithPassword({'email': email, 'password': password})
-        if error:
-            return jsonify({"error": error.message}), 400
-        profile = client.table('user_profiles').select('is_admin').eq('id', user.id).single().execute()
-        if not profile.data or not profile.data['is_admin']:
-            client.auth.signOut()
-            return jsonify({"error": "Not an admin"}), 403
-        return jsonify({"message": "Admin login successful", "token": user.id}), 200
+        
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+        
+        # Sign up with Supabase
+        response = supabase.auth.sign_up({
+            'email': email,
+            'password': password
+        })
+        
+        if response.user:
+            return jsonify({
+                'user': {
+                    'id': response.user.id,
+                    'email': response.user.email
+                },
+                'message': 'User created successfully'
+            }), 201
+        else:
+            return jsonify({'error': 'Signup failed'}), 400
+            
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 400
 
-# Notify Shareholders Endpoint
-@app.route('/api/notify-shareholders', methods=['POST'])
-def notify_shareholders():
-    client = get_supabase()
-    data = request.json
+@app.route('/api/auth/login', methods=['POST'])
+def login():
     try:
-        user = client.auth.get_user()
-        company_id = data.get('company_id')
-        shareholder_ids = data.get('shareholder_ids', [])
-        company = client.table('companies').select('id').eq('id', company_id).eq('user_id', user.user.id).execute()
-        if not company.data:
-            return jsonify({"error": "Company not found or not authorized"}), 404
-
-        shareholders = client.table('shareholders').select('*').in_('id', shareholder_ids).execute()
-        for shareholder in shareholders.data:
-            # Placeholder for email sending (replace with actual service like SendGrid)
-            subject = f"Shareholding Update for {company.data[0]['name']}"
-            body = f"Dear {shareholder['name']},\nYour current shareholding details are...\n\nBest,\nEquity Manager Team"
-            print(f"Would send email to {shareholder['email']}: {subject} - {body}")  # Debug print
-        return jsonify({"message": f"Notifications prepared for {len(shareholders.data)} shareholders"}), 200
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+        
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+        
+        # Sign in with Supabase
+        response = supabase.auth.sign_in_with_password({
+            'email': email,
+            'password': password
+        })
+        
+        if response.user:
+            return jsonify({
+                'user': {
+                    'id': response.user.id,
+                    'email': response.user.email
+                },
+                'session': {
+                    'access_token': response.session.access_token if response.session else None,
+                    'refresh_token': response.session.refresh_token if response.session else None
+                }
+            }), 200
+        else:
+            return jsonify({'error': 'Invalid credentials'}), 401
+            
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 401
 
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    try:
+        # Get token from header
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            token = auth_header.split(' ')[1]
+            supabase.auth.sign_out()
+            return jsonify({'message': 'Logged out successfully'}), 200
+        else:
+            return jsonify({'error': 'No auth token provided'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# Company endpoints
+@app.route('/api/companies', methods=['GET'])
+def get_companies():
+    try:
+        response = supabase.table('companies').select('*').execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/companies/<company_id>', methods=['GET'])
+def get_company(company_id):
+    try:
+        response = supabase.table('companies').select('*').eq('id', company_id).execute()
+        if response.data:
+            return jsonify(response.data[0]), 200
+        else:
+            return jsonify({'error': 'Company not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/companies', methods=['POST'])
+@verify_token
+def create_company():
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['name', 'description']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Add to Supabase
+        response = supabase.table('companies').insert(data).execute()
+        
+        if response.data:
+            return jsonify(response.data[0]), 201
+        else:
+            return jsonify({'error': 'Failed to create company'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Shareholder endpoints
+@app.route('/api/shareholders', methods=['GET'])
+def get_shareholders():
+    try:
+        company_id = request.args.get('company_id')
+        
+        query = supabase.table('shareholders').select('*')
+        
+        if company_id:
+            query = query.eq('company_id', company_id)
+        
+        response = query.execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/shareholders/<shareholder_id>', methods=['GET'])
+def get_shareholder(shareholder_id):
+    try:
+        response = supabase.table('shareholders').select('*').eq('id', shareholder_id).execute()
+        if response.data:
+            return jsonify(response.data[0]), 200
+        else:
+            return jsonify({'error': 'Shareholder not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/shareholders', methods=['POST'])
+@verify_token
+def create_shareholder():
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['company_id', 'name', 'email']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Add to Supabase
+        response = supabase.table('shareholders').insert(data).execute()
+        
+        if response.data:
+            return jsonify(response.data[0]), 201
+        else:
+            return jsonify({'error': 'Failed to create shareholder'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Shares endpoints
+@app.route('/api/shares', methods=['GET'])
+def get_shares():
+    try:
+        company_id = request.args.get('company_id')
+        shareholder_id = request.args.get('shareholder_id')
+        
+        query = supabase.table('shares').select('*')
+        
+        if company_id:
+            query = query.eq('company_id', company_id)
+        if shareholder_id:
+            query = query.eq('shareholder_id', shareholder_id)
+        
+        response = query.execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/shares', methods=['POST'])
+@verify_token
+def create_share():
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['company_id', 'shareholder_id', 'share_class_id', 'shares']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Set issue date if not provided
+        if 'issue_date' not in data:
+            data['issue_date'] = datetime.now().isoformat()
+        
+        # Add to Supabase
+        response = supabase.table('shares').insert(data).execute()
+        
+        if response.data:
+            return jsonify(response.data[0]), 201
+        else:
+            return jsonify({'error': 'Failed to create share'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/shares/<share_id>', methods=['PUT'])
+@verify_token
+def update_share(share_id):
+    try:
+        data = request.get_json()
+        
+        response = supabase.table('shares').update(data).eq('id', share_id).execute()
+        
+        if response.data:
+            return jsonify(response.data[0]), 200
+        else:
+            return jsonify({'error': 'Share not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/shares/<share_id>', methods=['DELETE'])
+@verify_token
+def delete_share(share_id):
+    try:
+        response = supabase.table('shares').delete().eq('id', share_id).execute()
+        return jsonify({'message': 'Share deleted successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Share issuances endpoints
+@app.route('/api/share-issuances', methods=['GET'])
+def get_share_issuances():
+    try:
+        company_id = request.args.get('company_id')
+        
+        query = supabase.table('share_issuances').select('*')
+        
+        if company_id:
+            query = query.eq('company_id', company_id)
+        
+        response = query.execute()
+        return jsonify(response.data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/share-issuances', methods=['POST'])
+@verify_token
+def create_share_issuance():
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['company_id', 'issue_date', 'round', 'price_per_share']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Add to Supabase
+        response = supabase.table('share_issuances').insert(data).execute()
+        
+        if response.data:
+            return jsonify(response.data[0]), 201
+        else:
+            return jsonify({'error': 'Failed to create share issuance'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# User profile endpoints
+@app.route('/api/profile', methods=['GET'])
+@verify_token
+def get_profile():
+    try:
+        user = request.current_user
+        response = supabase.table('user_profiles').select('*').eq('id', user.user.id).execute()
+        
+        if response.data:
+            return jsonify(response.data[0]), 200
+        else:
+            return jsonify({'error': 'Profile not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Root endpoint
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        'message': 'Kapitalized Equity API',
+        'version': '1.0.0',
+        'endpoints': [
+            '/api/health',
+            '/api/auth/login',
+            '/api/auth/signup',
+            '/api/companies',
+            '/api/shareholders',
+            '/api/shares'
+        ]
+    })
+
+# Catch all for API routes
+@app.route('/api', methods=['GET'])
+def api_root():
+    return jsonify({
+        'message': 'API is running',
+        'available_endpoints': [
+            '/api/health',
+            '/api/test',
+            '/api/auth/login',
+            '/api/auth/signup',
+            '/api/companies',
+            '/api/shareholders', 
+            '/api/shares',
+            '/api/share-issuances'
+        ]
+    })
+
+# Error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
+
+# This is important for Vercel
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
