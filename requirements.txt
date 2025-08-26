@@ -1,0 +1,6 @@
+Flask==2.3.3
+flask-cors==4.0.1
+supabase==2.5.0
+python-dotenv==1.0.1
+gunicorn==21.2.0
+sib-api-v3-sdk
