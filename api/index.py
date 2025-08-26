@@ -655,13 +655,18 @@ def get_admin_shareholders():
     except Exception as e:
         return jsonify({'error': str(e), 'message': 'Failed to fetch shareholders'}), 500
 
-@app.route('/api/admin/share-issuances', methods=['GET'])
-def get_admin_share_issuances():
+@app.route('/api/admin/issuances', methods=['GET'])
+def get_admin_issuances_alias():
     try:
         response = supabase.table('share_issuances').select('*').execute()
+        # Convert IDs to strings to fix the substring error
+        for item in response.data:
+            for key in ['id', 'company_id', 'shareholder_id', 'share_class_id']:
+                if key in item and item[key] is not None:
+                    item[key] = str(item[key])
         return jsonify(response.data), 200
     except Exception as e:
-        return jsonify({'error': str(e), 'message': 'Failed to fetch share issuances'}), 500
+        return jsonify({'error': str(e)}), 500
 
 # Admin delete endpoints
 @app.route('/api/admin/companies/<company_id>', methods=['DELETE'])
