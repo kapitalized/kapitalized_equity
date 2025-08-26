@@ -2229,7 +2229,7 @@ const sendShareholderNotifications = async () => {
     console.log('Sending notification payload:', payload); // Debug log
 
     // Use the correct API endpoint URL
-    const response = await fetch('/api/notify-shareholders', {
+    const NOTIFICATION_BACKEND_URL = "/api/notify-shareholders";
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
