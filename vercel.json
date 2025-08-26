@@ -10,9 +10,17 @@
     {
       "src": "api/index.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/notify-shareholders.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
+    {
+      "src": "/api/notify-shareholders",
+      "dest": "/api/notify-shareholders.py"
+    },
     {
       "src": "/api/(.*)",
       "dest": "/api/index.py"
