@@ -168,7 +168,6 @@ const AdminApp = () => {
     const [allCompanies, setAllCompanies] = useState([]);
     const [allIssuances, setAllIssuances] = useState([]);
     const [currentView, setCurrentView] = useState('companies');
-    const [adminCompanySearchTerm, setAdminCompanySearchTerm] = useState('');
     const [adminSelectedCompany, setAdminSelectedCompany] = useState(null);
     const [adminUser, setAdminUser] = useState(null);
     const [showAdminConfirmModal, setShowAdminConfirmModal] = useState(false);
@@ -302,10 +301,6 @@ const AdminApp = () => {
       { key: 'price_per_share', header: 'Price/Share', isSortable: true },
     ];
   
-    const filteredAdminCompanies = allCompanies.filter(company =>
-      company.name.toLowerCase().includes(adminCompanySearchTerm.toLowerCase())
-    );
-  
     const displayedIssuances = adminSelectedCompany
       ? allIssuances.filter(issuance => issuance.company_id === adminSelectedCompany.id)
       : allIssuances;
@@ -377,7 +372,7 @@ const AdminApp = () => {
             )}
   
             {currentView === 'companies' && (
-              <SortableTable data={filteredAdminCompanies} columns={companyColumns} onRowDelete={handleAdminDelete} onRowEdit={handleAdminEdit} entityType="company" addError={addError} />
+              <SortableTable data={allCompanies} columns={companyColumns} onRowDelete={handleAdminDelete} onRowEdit={handleAdminEdit} entityType="company" addError={addError} />
             )}
             {currentView === 'issuances' && (
               <SortableTable data={displayedIssuances} columns={issuanceColumns} onRowDelete={handleAdminDelete} onRowEdit={handleAdminEdit} entityType="issuance" addError={addError} />
