@@ -1,6 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { theme, PIE_CHART_COLORS } from '../../styles';
+import { PIE_CHART_COLORS } from '../../styles';
 import SortableTable from '../ui/SortableTable'; // We will use our new component
 
 const EquityHomePage = ({ companyData, shareClasses }) => {
