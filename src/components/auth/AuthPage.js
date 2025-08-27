@@ -3,13 +3,14 @@ import { Building2, Loader2, XCircle } from 'lucide-react';
 import * as AuthService from '../../services/authService';
 
 const AuthPage = () => {
-  const [showLogin, setShowLogin] = useState(true);
+  const [authView, setAuthView] = useState('login'); // 'login', 'signup', or 'forgotPassword'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [signUpData, setSignUpData] = useState({ email: '', password: '', fullName: '', username: '' });
+  const [resetEmail, setResetEmail] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -31,9 +32,29 @@ const AuthPage = () => {
       setError(error.message);
     } else {
       setSuccessMessage('Sign up successful! Please check your email to confirm your account.');
-      setShowLogin(true);
+      setAuthView('login');
     }
     setLoading(false);
+  };
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccessMessage('');
+    const { error } = await AuthService.sendPasswordResetEmail(resetEmail);
+    if (error) {
+        setError(error.message);
+    } else {
+        setSuccessMessage(`If an account exists for ${resetEmail}, a password reset link has been sent.`);
+    }
+    setLoading(false);
+  };
+
+  const switchView = (view) => {
+      setAuthView(view);
+      setError('');
+      setSuccessMessage('');
   };
 
   return (
@@ -42,7 +63,11 @@ const AuthPage = () => {
         <div className="text-center mb-6">
           <Building2 className="mx-auto h-12 w-12 text-blue-600" />
           <h2 className="mt-2 text-2xl font-bold text-gray-900">Equity Management</h2>
-          <p className="text-gray-600">{showLogin ? 'Sign in to your account' : 'Create a new account'}</p>
+          <p className="text-gray-600">
+            {authView === 'login' && 'Sign in to your account'}
+            {authView === 'signup' && 'Create a new account'}
+            {authView === 'forgotPassword' && 'Reset your password'}
+          </p>
         </div>
 
         {error && (
@@ -60,23 +85,26 @@ const AuthPage = () => {
             </div>
         )}
 
-        {showLogin ? (
+        {authView === 'login' && (
           <form onSubmit={handleLogin}>
-            {/* Login Form Inputs */}
             <div className="mb-4">
               <input type="email" placeholder="Email" value={loginData.email} onChange={(e) => setLoginData({...loginData, email: e.target.value})} className="w-full px-3 py-2 border rounded-md" required />
             </div>
-            <div className="mb-6">
+            <div className="mb-4">
               <input type="password" placeholder="Password" value={loginData.password} onChange={(e) => setLoginData({...loginData, password: e.target.value})} className="w-full px-3 py-2 border rounded-md" required />
+            </div>
+            <div className="text-right mb-4">
+                <button type="button" onClick={() => switchView('forgotPassword')} className="text-sm text-blue-600 hover:underline">Forgot Password?</button>
             </div>
             <button type="submit" className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 flex items-center justify-center" disabled={loading}>
               {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
               Sign In
             </button>
           </form>
-        ) : (
+        )}
+
+        {authView === 'signup' && (
           <form onSubmit={handleSignUp}>
-            {/* Sign-up Form Inputs */}
             <div className="mb-4">
                 <input type="text" placeholder="Full Name (optional)" value={signUpData.fullName} onChange={(e) => setSignUpData({...signUpData, fullName: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
             </div>
@@ -96,10 +124,24 @@ const AuthPage = () => {
           </form>
         )}
 
+        {authView === 'forgotPassword' && (
+            <form onSubmit={handlePasswordReset}>
+                <div className="mb-4">
+                    <input type="email" placeholder="Enter your email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                </div>
+                <button type="submit" className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 flex items-center justify-center" disabled={loading}>
+                    {loading && <Loader2 className="h-5 w-5 mr-2 animate-spin" />}
+                    Send Reset Link
+                </button>
+            </form>
+        )}
+
         <p className="mt-4 text-sm text-center">
-          {showLogin ? "Don't have an account? " : "Already have an account? "}
-          <button onClick={() => { setShowLogin(!showLogin); setError(''); setSuccessMessage(''); }} className="text-blue-600 hover:underline">
-            {showLogin ? 'Sign Up' : 'Sign In'}
+          {authView === 'login' && "Don't have an account? "}
+          {authView === 'signup' && "Already have an account? "}
+          {authView === 'forgotPassword' && "Remembered your password? "}
+          <button onClick={() => switchView(authView === 'login' || authView === 'forgotPassword' ? 'signup' : 'login')} className="text-blue-600 hover:underline">
+            {authView === 'login' || authView === 'forgotPassword' ? 'Sign Up' : 'Sign In'}
           </button>
         </p>
       </div>
