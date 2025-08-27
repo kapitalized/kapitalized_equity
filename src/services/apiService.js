@@ -115,6 +115,36 @@ export const createCompany = async (companyData, userId) => {
 };
 
 /**
+ * Updates an existing company.
+ * @param {string} companyId - The ID of the company to update.
+ * @param {object} companyData - The new data for the company.
+ * @returns {Promise<object>} The updated company data.
+ */
+export const updateCompany = async (companyId, companyData) => {
+    const { data, error } = await supabaseClient
+        .from('companies')
+        .update(companyData)
+        .eq('id', companyId)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+};
+
+/**
+ * Deletes a company.
+ * @param {string} companyId - The ID of the company to delete.
+ */
+export const deleteCompany = async (companyId) => {
+    const { error } = await supabaseClient
+        .from('companies')
+        .delete()
+        .eq('id', companyId);
+    if (error) throw error;
+};
+
+
+/**
  * Creates a new shareholder.
  * @param {object} shareholderData - The data for the new shareholder.
  * @param {string} companyId - The ID of the company this shareholder belongs to.
