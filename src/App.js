@@ -1114,69 +1114,83 @@ const EquityManagementApp = () => {
     }
   }, [user, fetchUserProfile]);
 
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  // REFACTORED AUTH LOGIC
+  const handleAuthAction = async (authPromise) => {
     setErrors([]);
     setSignUpSuccessMessage('');
     setLoading(true);
+
     if (!window.supabaseClient) {
       addError("Supabase client not initialized.");
       setLoading(false);
-      return;
+      return { error: new Error("Supabase client not initialized.") };
     }
-    const { error } = await window.supabaseClient.auth.signInWithPassword({
-      email: loginData.email,
-      password: loginData.password,
-    });
-    setLoading(false);
-    if (error) {
-      addError('Login failed: ' + error.message);
+
+    try {
+      const { error } = await authPromise;
+      if (error) {
+        addError(error.message);
+        return { error };
+      }
+      return { error: null };
+    } catch (error) {
+      addError('An unexpected error occurred: ' + error.message);
+      return { error };
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    await handleAuthAction(
+      window.supabaseClient.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
+      })
+    );
   };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
     setErrors([]);
-    setSignUpSuccessMessage('');
     setLoading(true);
+
     if (!window.supabaseClient) {
-      addError("Supabase client not initialized.");
-      setLoading(false);
-      return;
+        addError("Supabase client not initialized.");
+        setLoading(false);
+        return;
     }
+
     try {
-      const generatedUsername = signUpData.username || `user_${Math.random().toString(36).substring(2, 9)}`;
+        const generatedUsername = signUpData.username || `user_${Math.random().toString(36).substring(2, 9)}`;
 
-      const { data, error } = await window.supabaseClient.auth.signUp({
-        email: signUpData.email,
-        password: signUpData.password,
-        options: {
-          data: {
-            full_name: signUpData.fullName,
-            username: generatedUsername
-          }
+        const { data, error } = await window.supabaseClient.auth.signUp({
+            email: signUpData.email,
+            password: signUpData.password,
+            options: {
+                data: {
+                    full_name: signUpData.fullName,
+                    username: generatedUsername
+                }
+            }
+        });
+
+        if (error) {
+            addError(error.message);
+        } else if (data.user) {
+            setSignUpSuccessMessage('Sign up successful! Please check your email to confirm your account. You can now log in.');
+            setShowSignUp(false);
+            setShowLogin(true);
+            setLoginData({ email: signUpData.email, password: '' });
         }
-      });
-      setLoading(false);
-
-      if (error) {
-        addError(error.message);
-      } else if (data.user) {
-        setSignUpSuccessMessage('Sign up successful! Please check your email to confirm your account. You can now log in.');
-
-        // Removed the call to createSampleDataForNewUser(data.user.id);
-        // await createSampleDataForNewUser(data.user.id);
-
-        setShowSignUp(false);
-        setShowLogin(true);
-        setLoginData({ email: signUpData.email, password: '' });
-      }
     } catch (error) {
-      addError('Sign up failed: ' + error.message);
-      setLoading(false);
+        addError('Sign up failed: ' + error.message);
+    } finally {
+        setLoading(false);
     }
   };
+
 
   const handleLogout = async () => {
     setLoading(true);
@@ -3045,7 +3059,7 @@ const sendShareholderNotifications = async () => {
                         <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Share Class for Future Issuance</label>
                         <select
                           value={futureIssuanceData.shareClassId}
-                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareClassId: e.target.value})}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuancedata, shareClassId: e.target.value})}
                           className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           required
