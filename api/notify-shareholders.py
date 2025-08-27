@@ -1,4 +1,4 @@
-# api/notify-shareholders.py
+# api/notify-shareholders.py updated using Brevo
 import os
 import json
 from datetime import datetime
