@@ -393,4 +393,4 @@ const AdminApp = () => {
     );
   };
   
-  export { AdminApp };
+export default AdminApp;
