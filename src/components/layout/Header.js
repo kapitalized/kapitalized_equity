@@ -2,8 +2,13 @@ import React, { useState } from 'react';
 import { User, ChevronDown } from 'lucide-react';
 import * as AuthService from '../../services/authService';
 
-const Header = ({ user, userProfile, selectedCompany, companies, setSelectedCompany }) => {
+const Header = ({ user, userProfile, selectedCompany, companies, setSelectedCompany, setActiveTab }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
+
+    const handleNavClick = (tab) => {
+        setActiveTab(tab);
+        setDropdownOpen(false);
+    };
 
     return (
         <header className="bg-white shadow-sm border-b p-4 flex justify-between items-center">
@@ -32,8 +37,9 @@ const Header = ({ user, userProfile, selectedCompany, companies, setSelectedComp
                 </button>
                 {dropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
-                        <a href="#profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
-                        <a href="#settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                        <button onClick={() => handleNavClick('account')} className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            My Account
+                        </button>
                         <div className="border-t my-1"></div>
                         <button
                             onClick={() => {
