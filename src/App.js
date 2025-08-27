@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AdminApp } from './AdminApp'; // Note: AdminLogin is no longer exported here
-import AdminLoginPage from './components/auth/AdminLoginPage'; // Import the new component
+import AdminApp from './AdminApp'; // Import as default
+import AdminLoginPage from './components/auth/AdminLoginPage';
 import * as AuthService from './services/authService';
 import * as ApiService from './services/apiService';
 
