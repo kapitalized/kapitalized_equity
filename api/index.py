@@ -635,6 +635,10 @@ def create_test_data():
 def get_admin_users():
     try:
         response = supabase.table('user_profiles').select('*').execute()
+        # Convert IDs to strings to fix the substring error
+        for item in response.data:
+            if 'id' in item and item['id'] is not None:
+                item['id'] = str(item['id'])
         return jsonify(response.data), 200
     except Exception as e:
         return jsonify({'error': str(e), 'message': 'Failed to fetch users'}), 500
@@ -643,6 +647,12 @@ def get_admin_users():
 def get_admin_companies():
     try:
         response = supabase.table('companies').select('*').execute()
+        # Convert IDs to strings to fix the substring error
+        for item in response.data:
+            if 'id' in item and item['id'] is not None:
+                item['id'] = str(item['id'])
+            if 'user_id' in item and item['user_id'] is not None:
+                item['user_id'] = str(item['user_id'])
         return jsonify(response.data), 200
     except Exception as e:
         return jsonify({'error': str(e), 'message': 'Failed to fetch companies'}), 500
