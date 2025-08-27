@@ -29,3 +29,6 @@ export const SHAREHOLDER_TYPES = [
 
 // Share types to exclude from 'ex-Options' calculations
 export const EXCLUDED_SHARE_TYPES = ['Convertible', 'Options'];
+
+// Colors for Pie Charts
+export const PIE_CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#bada55', '#ff69b4', '#ffa500'];
