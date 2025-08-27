@@ -3059,7 +3059,7 @@ const sendShareholderNotifications = async () => {
                         <label className="block text-sm font-medium" style={{ color: theme.lightText }}>Share Class for Future Issuance</label>
                         <select
                           value={futureIssuanceData.shareClassId}
-                          onChange={(e) => setFutureIssuanceData({...futureIssuancedata, shareClassId: e.target.value})}
+                          onChange={(e) => setFutureIssuanceData({...futureIssuanceData, shareClassId: e.target.value})}
                           className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2"
                           style={{ borderColor: theme.borderColor, backgroundColor: theme.cardBackground, color: theme.text, '--tw-ring-color': theme.primary }}
                           required
