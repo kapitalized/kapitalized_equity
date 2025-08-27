@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import AdminApp from './AdminApp'; // Import as default
+import AdminApp from './AdminApp';
 import AdminLoginPage from './components/auth/AdminLoginPage';
 import * as AuthService from './services/authService';
 import * as ApiService from './services/apiService';
@@ -32,9 +32,12 @@ const App = () => {
         setLoading(true);
         ApiService.fetchCompanies(user.id).then(userCompanies => {
             setCompanies(userCompanies);
-            if (userCompanies.length > 0 && !selectedCompany) {
-                setSelectedCompany(userCompanies[0]);
-            } else if (userCompanies.length === 0) {
+            if (userCompanies.length > 0) {
+                // If a company is already selected, keep it, otherwise select the first one.
+                const currentSelection = selectedCompany ? userCompanies.find(c => c.id === selectedCompany.id) : null;
+                setSelectedCompany(currentSelection || userCompanies[0]);
+            } else {
+                setSelectedCompany(null);
                 setLoading(false);
             }
         });
@@ -79,17 +82,17 @@ const App = () => {
       ]).then(([profile, userCompanies]) => {
         setUserProfile(profile);
         setCompanies(userCompanies);
-        if (userCompanies.length > 0 && !selectedCompany) {
+        if (userCompanies.length > 0) {
           setSelectedCompany(userCompanies[0]);
-        } else if (userCompanies.length === 0) {
-            setLoading(false);
+        } else {
+            setLoading(false); // Explicitly stop loading if no companies
         }
       }).catch(error => {
         console.error("Failed to fetch initial user data:", error);
         setLoading(false);
       });
     }
-  }, [user, selectedCompany]);
+  }, [user]);
 
   useEffect(() => {
     if (selectedCompany) {
