@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AdminApp, AdminLogin } from './AdminApp';
 import * as AuthService from './services/authService';
 import * as ApiService from './services/apiService';
@@ -14,6 +14,7 @@ import ShareholdersPage from './components/pages/ShareholdersPage';
 import IssuancesPage from './components/pages/IssuancesPage';
 import ReportsPage from './components/pages/ReportsPage';
 import NotificationsPage from './components/pages/NotificationsPage';
+import AccountPage from './components/pages/AccountPage';
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -24,6 +25,16 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('productselect');
   const [currentRoute, setCurrentRoute] = useState(window.location.pathname);
+
+  const refreshCompanyData = useCallback(() => {
+    if (selectedCompany) {
+      setLoading(true);
+      ApiService.fetchCompanyRelatedData(selectedCompany.id)
+        .then(setCompanyData)
+        .catch(error => console.error("Failed to refetch company data:", error))
+        .finally(() => setLoading(false));
+    }
+  }, [selectedCompany]);
 
   // --- AUTHENTICATION & DATA FETCHING ---
   useEffect(() => {
@@ -67,13 +78,9 @@ const App = () => {
 
   useEffect(() => {
     if (selectedCompany) {
-      setLoading(true);
-      ApiService.fetchCompanyRelatedData(selectedCompany.id)
-        .then(setCompanyData)
-        .catch(error => console.error("Failed to fetch company data:", error))
-        .finally(() => setLoading(false));
+        refreshCompanyData();
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, refreshCompanyData]);
 
   // --- ROUTING ---
   useEffect(() => {
@@ -86,7 +93,7 @@ const App = () => {
     if (activeTab === 'productselect') {
         return <ProductSelectPage onProductSelect={setActiveTab} />;
     }
-    if (!selectedCompany) {
+    if (!selectedCompany && activeTab !== 'account') {
         return (
             <div className="text-center p-10 bg-white rounded-lg shadow">
                 <h2 className="text-2xl font-bold mb-4">Welcome!</h2>
@@ -99,13 +106,15 @@ const App = () => {
       case 'companies':
         return <CompaniesPage companies={companies} />;
       case 'shareholders':
-        return <ShareholdersPage companyData={companyData} />;
+        return <ShareholdersPage companyData={companyData} selectedCompany={selectedCompany} onDataRefresh={refreshCompanyData} />;
       case 'issuances':
         return <IssuancesPage companyData={companyData} />;
       case 'reports':
         return <ReportsPage />;
       case 'notifications':
         return <NotificationsPage companyData={companyData} />;
+      case 'account':
+        return <AccountPage user={user} userProfile={userProfile} />;
       case 'equityhome':
       default:
         return <EquityHomePage companyData={companyData} shareClasses={companyData.shareClasses} />;
@@ -135,6 +144,7 @@ const App = () => {
                 selectedCompany={selectedCompany}
                 companies={companies}
                 setSelectedCompany={setSelectedCompany}
+                setActiveTab={setActiveTab}
             />
         )}
         <main className="p-6 overflow-y-auto">
