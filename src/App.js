@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminApp, AdminLogin } from './AdminApp';
 import * as AuthService from './services/authService';
 import * as ApiService from './services/apiService';
@@ -11,7 +11,7 @@ import * as ApiService from './services/apiService';
 
 const App = () => {
   const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
+  const [, setUserProfile] = useState(null); // 'userProfile' is intentionally unused for now
   const [loading, setLoading] = useState(true);
   const [currentRoute, setCurrentRoute] = useState(window.location.pathname);
 
