@@ -26,6 +26,20 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('productselect');
   const [currentRoute, setCurrentRoute] = useState(window.location.pathname);
 
+  const refreshAllData = useCallback(() => {
+    if (user) {
+        setLoading(true);
+        ApiService.fetchCompanies(user.id).then(userCompanies => {
+            setCompanies(userCompanies);
+            if (userCompanies.length > 0 && !selectedCompany) {
+                setSelectedCompany(userCompanies[0]);
+            } else if (userCompanies.length === 0) {
+                setLoading(false);
+            }
+        });
+    }
+  }, [user, selectedCompany]);
+
   const refreshCompanyData = useCallback(() => {
     if (selectedCompany) {
       setLoading(true);
@@ -94,27 +108,22 @@ const App = () => {
         return <ProductSelectPage onProductSelect={setActiveTab} />;
     }
     if (!selectedCompany && activeTab !== 'account') {
-        return (
-            <div className="text-center p-10 bg-white rounded-lg shadow">
-                <h2 className="text-2xl font-bold mb-4">Welcome!</h2>
-                <p>Create a company to get started with Equity Management.</p>
-            </div>
-        );
+        return <CompaniesPage companies={companies} user={user} onDataRefresh={refreshAllData} />;
     }
 
     switch (activeTab) {
       case 'companies':
-        return <CompaniesPage companies={companies} />;
+        return <CompaniesPage companies={companies} user={user} onDataRefresh={refreshAllData} />;
       case 'shareholders':
         return <ShareholdersPage companyData={companyData} selectedCompany={selectedCompany} onDataRefresh={refreshCompanyData} />;
       case 'issuances':
-        return <IssuancesPage companyData={companyData} />;
+        return <IssuancesPage companyData={companyData} selectedCompany={selectedCompany} onDataRefresh={refreshCompanyData} />;
       case 'reports':
         return <ReportsPage />;
       case 'notifications':
         return <NotificationsPage companyData={companyData} />;
       case 'account':
-        return <AccountPage user={user} userProfile={userProfile} />;
+        return <AccountPage user={user} userProfile={userProfile} onProfileUpdate={() => ApiService.fetchUserProfile(user.id).then(setUserProfile)} />;
       case 'equityhome':
       default:
         return <EquityHomePage companyData={companyData} shareClasses={companyData.shareClasses} />;
