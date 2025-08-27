@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Building2, Users, PlusCircle, Download, Mail } from 'lucide-react'; // Added icons
+import { BarChart3, Building2, Users, PlusCircle, Download, Mail } from 'lucide-react';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
     const navItems = [
@@ -14,7 +14,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     return (
         <div className="w-64 bg-white shadow-md h-screen flex flex-col">
             <div className="p-4 border-b">
-                <h1 className="text-xl font-bold">Kapitalized</h1>
+                <img src="https://kapitalized.com/wp-content/uploads/KAP-Logo-150px.webp" alt="Kapitalized Logo" className="h-10" />
             </div>
             <nav className="p-4">
                 <ul>
