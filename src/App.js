@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AdminApp, AdminLogin } from './AdminApp';
+import { AdminApp } from './AdminApp'; // Note: AdminLogin is no longer exported here
+import AdminLoginPage from './components/auth/AdminLoginPage'; // Import the new component
 import * as AuthService from './services/authService';
 import * as ApiService from './services/apiService';
 
@@ -135,7 +136,7 @@ const App = () => {
   }
 
   if (currentRoute.startsWith('/adminhq')) {
-    return currentRoute === '/adminhq/login' ? <AdminLogin /> : <AdminApp />;
+    return currentRoute === '/adminhq/login' ? <AdminLoginPage /> : <AdminApp />;
   }
 
   if (!user) {
