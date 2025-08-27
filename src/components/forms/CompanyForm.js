@@ -5,7 +5,7 @@ const CompanyForm = ({ onSubmit, onCancel, initialData = {} }) => {
   const [data, setData] = useState({
     name: initialData.name || '',
     description: initialData.description || '',
-    address: initialData.address || { line1: '', line2: '', country: '', state: '', postcode: '' }
+    address: initialData.address || { line1: '', line2: '', suburb: '', country: '', state: '', postcode: '' }
   });
 
   const handleAddressChange = (address) => setData(prev => ({ ...prev, address }));
