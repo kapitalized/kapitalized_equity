@@ -12,6 +12,8 @@ import EquityHomePage from './components/pages/EquityHomePage';
 import CompaniesPage from './components/pages/CompaniesPage';
 import ShareholdersPage from './components/pages/ShareholdersPage';
 import IssuancesPage from './components/pages/IssuancesPage';
+import ReportsPage from './components/pages/ReportsPage';
+import NotificationsPage from './components/pages/NotificationsPage';
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -100,6 +102,10 @@ const App = () => {
         return <ShareholdersPage companyData={companyData} />;
       case 'issuances':
         return <IssuancesPage companyData={companyData} />;
+      case 'reports':
+        return <ReportsPage />;
+      case 'notifications':
+        return <NotificationsPage companyData={companyData} />;
       case 'equityhome':
       default:
         return <EquityHomePage companyData={companyData} shareClasses={companyData.shareClasses} />;
