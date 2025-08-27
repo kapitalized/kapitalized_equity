@@ -1,9 +1,8 @@
-# api/notify-shareholders.py updated using Brevo
+# api/notify-shareholders.py
 import os
 import json
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs
 
 # Import required libraries
 try:
@@ -21,7 +20,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 
 # Initialize Supabase client
-supabase: Client = None
+supabase = None
 if IMPORTS_AVAILABLE and SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -40,7 +39,7 @@ if IMPORTS_AVAILABLE and BREVO_API_KEY:
 
 def load_email_template():
     """Load the HTML email template with fallback"""
-    fallback_template = '''
+    return '''
     <!DOCTYPE html>
     <html>
     <head>
@@ -74,7 +73,6 @@ def load_email_template():
     </body>
     </html>
     '''
-    return fallback_template
 
 def format_issuances_html(issuances):
     """Format issuances data into HTML for the email template"""
@@ -97,7 +95,7 @@ def format_issuances_html(issuances):
     
     return ''.join(html_parts)
 
-def send_shareholder_email(shareholder_email, shareholder_name, company_name, issuances, contact_email="support@kapitalized.com"):
+def send_shareholder_email(shareholder_email, shareholder_name, company_name, issuances, contact_email="hello@kapitalized.com"):
     """Send email to individual shareholder"""
     if not api_instance:
         return {"success": False, "error": "Email service not configured"}
@@ -236,7 +234,8 @@ class handler(BaseHTTPRequestHandler):
                     shareholder_email=shareholder_email,
                     shareholder_name=shareholder_name,
                     company_name=company_name,
-                    issuances=enriched_issuances
+                    issuances=enriched_issuances,
+                    contact_email="hello@kapitalized.com"  # Use verified email
                 )
                 
                 if result["success"]:
