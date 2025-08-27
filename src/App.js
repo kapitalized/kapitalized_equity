@@ -33,7 +33,6 @@ const App = () => {
         ApiService.fetchCompanies(user.id).then(userCompanies => {
             setCompanies(userCompanies);
             if (userCompanies.length > 0) {
-                // If a company is already selected, keep it, otherwise select the first one.
                 const currentSelection = selectedCompany ? userCompanies.find(c => c.id === selectedCompany.id) : null;
                 setSelectedCompany(currentSelection || userCompanies[0]);
             } else {
@@ -51,6 +50,10 @@ const App = () => {
         .then(setCompanyData)
         .catch(error => console.error("Failed to refetch company data:", error))
         .finally(() => setLoading(false));
+    } else {
+        // If there's no selected company, we are not loading company data.
+        setCompanyData({ shareholders: [], shareClasses: [], shareIssuances: [] });
+        setLoading(false);
     }
   }, [selectedCompany]);
 
@@ -62,7 +65,6 @@ const App = () => {
         setLoading(false);
         setCompanies([]);
         setSelectedCompany(null);
-        setCompanyData({ shareholders: [], shareClasses: [], shareIssuances: [] });
         setActiveTab('productselect');
       }
     });
@@ -76,16 +78,13 @@ const App = () => {
   useEffect(() => {
     if (user) {
       setLoading(true);
-      Promise.all([
-        ApiService.fetchUserProfile(user.id),
-        ApiService.fetchCompanies(user.id)
-      ]).then(([profile, userCompanies]) => {
-        setUserProfile(profile);
+      ApiService.fetchUserProfile(user.id).then(setUserProfile);
+      ApiService.fetchCompanies(user.id).then(userCompanies => {
         setCompanies(userCompanies);
         if (userCompanies.length > 0) {
           setSelectedCompany(userCompanies[0]);
         } else {
-            setLoading(false); // Explicitly stop loading if no companies
+          setLoading(false);
         }
       }).catch(error => {
         console.error("Failed to fetch initial user data:", error);
@@ -97,8 +96,11 @@ const App = () => {
   useEffect(() => {
     if (selectedCompany) {
         refreshCompanyData();
+    } else if (user && companies.length === 0) {
+        // This handles the case where a user has an account but no companies yet.
+        setLoading(false);
     }
-  }, [selectedCompany, refreshCompanyData]);
+  }, [selectedCompany, user, companies, refreshCompanyData]);
 
   // --- ROUTING ---
   useEffect(() => {
