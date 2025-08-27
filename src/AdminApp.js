@@ -28,7 +28,7 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
     const [sortColumn, setSortColumn] = useState(null);
     const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
     const [searchTerm, setSearchTerm] = useState('');
-  
+
     const handleSort = (columnKey) => {
       if (sortColumn === columnKey) {
         setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -37,15 +37,15 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
         setSortDirection('asc');
       }
     };
-  
+
     const filteredData = data.filter(row =>
       Object.values(row).some(value =>
         String(value).toLowerCase().includes(searchTerm.toLowerCase())
       )
     );
-  
+
     const sortedData = _.orderBy(filteredData, [sortColumn], [sortDirection]);
-  
+
     const calculateTotals = () => {
       const totals = {};
       columns.forEach(col => {
@@ -55,9 +55,9 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
       });
       return totals;
     };
-  
+
     const totals = calculateTotals();
-  
+
     return (
       <div className="space-y-4 w-full"> {/* Added w-full */}
         <div className="relative">
@@ -134,8 +134,8 @@ const SortableTable = ({ data, columns, onRowDelete, onRowEdit, entityType, addE
       </div>
     );
   };
-  
-  
+
+
   // AdminConfirmModal Component
   const AdminConfirmModal = ({ message, onConfirm, onCancel }) => (
     <Modal onClose={onCancel}>
@@ -168,23 +168,23 @@ const AdminApp = () => {
     const [allCompanies, setAllCompanies] = useState([]);
     const [allIssuances, setAllIssuances] = useState([]);
     const [currentView, setCurrentView] = useState('companies'); // Default to companies for admin
-  
+
     // State for company search/filter in admin
     const [adminCompanySearchTerm, setAdminCompanySearchTerm] = useState('');
     const [adminSelectedCompany, setAdminSelectedCompany] = useState(null);
     const [adminUser, setAdminUser] = useState(null); // Admin user state
-  
+
     // State for custom confirmation modal
     const [showAdminConfirmModal, setShowAdminConfirmModal] = useState(false);
     const [adminConfirmModalDetails, setAdminConfirmModalDetails] = useState({ id: null, type: '', message: '' });
-  
-  
+
+
     const addError = (message) => {
       // For admin interface, we might display errors differently or log them
       console.error("Admin Error:", message);
       // You could add a local state here to display admin-specific errors
     };
-  
+
     const fetchAllAdminData = useCallback(async () => {
       setLoadingAdminData(true);
       try {
@@ -194,21 +194,21 @@ const AdminApp = () => {
         const usersData = await usersResponse.json();
         console.log("Admin: Fetched users data:", usersData);
         setAllUsers(usersData);
-  
+
         console.log("Admin: Fetching companies data...");
         const companiesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/companies`);
         if (!companiesResponse.ok) throw new Error(`HTTP error fetching companies! status: ${companiesResponse.status}`);
         const companiesData = await companiesResponse.json();
         console.log("Admin: Fetched companies data:", companiesData);
         setAllCompanies(companiesData);
-  
+
         console.log("Admin: Fetching issuances data...");
         const issuancesResponse = await fetch(`${ADMIN_BACKEND_BASE_URL}/issuances`);
         if (!issuancesResponse.ok) throw new Error(`HTTP error fetching issuances! status: ${issuancesResponse.status}`);
         const issuancesData = await issuancesResponse.json();
         console.log("Admin: Fetched issuances data:", issuancesData);
         setAllIssuances(issuancesData);
-  
+
       } catch (error) {
         console.error("Admin: Error fetching admin data:", error);
         addError('Failed to fetch admin data: ' + error.message);
@@ -216,14 +216,14 @@ const AdminApp = () => {
         setLoadingAdminData(false);
       }
     }, []);
-  
+
     useEffect(() => {
       const initAdminAuth = async () => {
         // Wait for the global supabaseClient to be available
         const checkSupabaseReady = () => {
           return typeof window.supabaseClient !== 'undefined' && window.supabaseClient !== null;
         };
-  
+
         if (!checkSupabaseReady()) {
           const interval = setInterval(() => {
             if (checkSupabaseReady()) {
@@ -235,25 +235,25 @@ const AdminApp = () => {
         }
         checkAdminAuth();
       };
-  
+
       const checkAdminAuth = async () => {
         if (!window.supabaseClient) { // Use the globally available client instance
           addError("Supabase client not initialized for AdminApp.");
           return;
         }
         const { data: { session }, error } = await window.supabaseClient.auth.getSession(); // Use the globally available client instance
-  
+
         if (error || !session) {
           window.location.href = '/adminhq/login';
           return;
         }
-  
+
         const { data: userProfile, error: profileError } = await window.supabaseClient // Use the globally available client instance
           .from('user_profiles')
           .select('is_admin')
           .eq('id', session.user.id)
           .single();
-  
+
         if (profileError || !userProfile?.is_admin) {
           await window.supabaseClient.auth.signOut(); // Use the globally available client instance
           window.location.href = '/adminhq/login';
@@ -262,11 +262,11 @@ const AdminApp = () => {
         setAdminUser(session.user);
         fetchAllAdminData();
       };
-  
+
       initAdminAuth();
     }, [fetchAllAdminData]); // Corrected dependency array
-  
-  
+
+
     const handleAdminDelete = async (id, type) => {
       setAdminConfirmModalDetails({
         id,
@@ -275,11 +275,11 @@ const AdminApp = () => {
       });
       setShowAdminConfirmModal(true);
     };
-  
+
     const confirmAdminDelete = async () => {
       const { id, type } = adminConfirmModalDetails;
       setShowAdminConfirmModal(false); // Close modal immediately
-  
+
       setLoadingAdminData(true);
       try {
         const entityPath = type + 's';
@@ -287,7 +287,7 @@ const AdminApp = () => {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
         });
-  
+
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(`HTTP error deleting ${type}! status: ${response.status}, message: ${errorData.detail || errorData.error}`);
@@ -301,52 +301,52 @@ const AdminApp = () => {
         setLoadingAdminData(false);
       }
     };
-  
+
     // Placeholder for admin edit functionality
     const handleAdminEdit = (id, type) => {
       console.log(`Admin editing ${type} with ID: ${id}`);
       addError(`Admin edit functionality for ${type} is not yet implemented.`);
       // In a real application, you would open a modal here to edit the data.
     };
-  
+
     const userColumns = [
-      { key: 'id', header: 'ID', isSortable: true, render: (row) => row.id.substring(0, 8) + '...' },
+      { key: 'id', header: 'ID', isSortable: true, render: (row) => String(row.id).substring(0, 8) + '...' },
       { key: 'full_name', header: 'Full Name', isSortable: true },
       { key: 'email', header: 'Email', isSortable: true },
       { key: 'created_at', header: 'Created At', isSortable: true, render: (row) => new Date(row.created_at).toLocaleDateString() },
     ];
-  
+
     const companyColumns = [
-      { key: 'id', header: 'ID', isSortable: true, render: (row) => row.id.substring(0, 8) + '...' },
+      { key: 'id', header: 'ID', isSortable: true, render: (row) => String(row.id).substring(0, 8) + '...' },
       { key: 'name', header: 'Name', isSortable: true },
       { key: 'description', header: 'Description', isSortable: true },
-      { key: 'user_id', header: 'Owner User ID', isSortable: true, render: (row) => row.user_id.substring(0, 8) + '...' },
+      { key: 'user_id', header: 'Owner User ID', isSortable: true, render: (row) => String(row.user_id).substring(0, 8) + '...' },
     ];
-  
+
     const issuanceColumns = [
-      { key: 'id', header: 'ID', isSortable: true, render: (row) => row.id.substring(0, 8) + '...' },
-      { key: 'company_id', header: 'Company ID', isSortable: true, render: (row) => row.company_id.substring(0, 8) + '...' },
-      { key: 'shareholder_id', header: 'Shareholder ID', isSortable: true, render: (row) => row.shareholder_id.substring(0, 8) + '...' },
+      { key: 'id', header: 'ID', isSortable: true, render: (row) => String(row.id).substring(0, 8) + '...' },
+      { key: 'company_id', header: 'Company ID', isSortable: true, render: (row) => String(row.company_id).substring(0, 8) + '...' },
+      { key: 'shareholder_id', header: 'Shareholder ID', isSortable: true, render: (row) => String(row.shareholder_id).substring(0, 8) + '...' },
       { key: 'shares', header: 'Shares', isSortable: true, isSummable: true },
       { key: 'price_per_share', header: 'Price/Share', isSortable: true },
     ];
-  
+
     const filteredAdminCompanies = allCompanies.filter(company =>
       company.name.toLowerCase().includes(adminCompanySearchTerm.toLowerCase())
     );
-  
+
     // Filter issuances by selected company, or show all if no company is selected
     const displayedIssuances = adminSelectedCompany
       ? allIssuances.filter(issuance => issuance.company_id === adminSelectedCompany.id)
       : allIssuances;
-  
+
     // Filter users by selected company's owner, or show all users if no company is selected
     // Corrected logic: if a company is selected, show only its owner. Otherwise, show all users.
     const displayedUsers = adminSelectedCompany
       ? allUsers.filter(userItem => userItem.id === adminSelectedCompany.user_id)
       : allUsers;
-  
-  
+
+
     if (loadingAdminData) {
       return (
         <div className="flex items-center justify-center h-64">
@@ -355,7 +355,7 @@ const AdminApp = () => {
         </div>
       );
     }
-  
+
     return (
       <div className="min-h-screen bg-gray-50 flex">
         {/* Admin Sidebar */}
@@ -378,7 +378,7 @@ const AdminApp = () => {
             </button>
           </nav>
         </div>
-  
+
         {/* Admin Main Content Area */}
         <div className="flex-1 flex flex-col" style={{ backgroundColor: theme.background }}>
           <div className="bg-white shadow-sm border-b" style={{ borderColor: theme.borderColor }}>
@@ -391,7 +391,7 @@ const AdminApp = () => {
           </div>
           <div className="flex-1 overflow-y-auto p-6">
             {/* Admin-specific errors could be displayed here */}
-  
+
             {/* Company Filter for Issuances and Users (if applicable) */}
             {(currentView === 'issuances' || currentView === 'users') && (
               <div className="mb-6 flex items-center space-x-4">
@@ -421,7 +421,7 @@ const AdminApp = () => {
                 />
               </div>
             )}
-  
+
             {currentView === 'companies' && (
               <>
                 <h3 className="text-lg font-bold mb-3" style={{ fontFamily: 'Roboto, sans-serif', fontWeight: 700, color: theme.text }}>All Companies</h3>
@@ -480,7 +480,7 @@ const AdminLogin = () => {
     const [loginData, setLoginData] = useState({ email: '', password: '' });
     const [loadingLogin, setLoadingLogin] = useState(false);
     const [loginError, setLoginError] = useState('');
-  
+
     const handleAdminLogin = async (e) => {
       e.preventDefault();
       setLoginError('');
@@ -495,32 +495,32 @@ const AdminLogin = () => {
           email: loginData.email,
           password: loginData.password,
         });
-  
+
         if (error) throw error;
-  
+
         // Check if the logged-in user is an admin
         const { data: userProfile, error: profileError } = await window.supabaseClient // Use global instance
           .from('user_profiles')
           .select('is_admin')
           .eq('id', data.user.id)
           .single();
-  
+
         if (profileError || !userProfile?.is_admin) {
           await window.supabaseClient.auth.signOut(); // Log out non-admin users // Use global instance
           setLoginError('You do not have admin privileges.');
           return;
         }
-  
+
         // Successful admin login, redirect to adminhq
         window.location.href = '/adminhq';
-  
+
       } catch (error) {
         setLoginError('Admin login failed: ' + error.message);
       } finally {
         setLoadingLogin(false);
       }
     };
-  
+
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
