@@ -68,7 +68,7 @@ const App = () => {
         setLoading(false);
       });
     }
-  }, [user]);
+  }, [user, selectedCompany]);
 
   useEffect(() => {
     if (selectedCompany) {
