@@ -1,4 +1,4 @@
-# api/notify-shareholders.py
+# api/notify-shareholders.py for emailing shareholders a summary
 import os
 import json
 from datetime import datetime
