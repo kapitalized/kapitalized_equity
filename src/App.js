@@ -10,9 +10,8 @@ import Header from './components/layout/Header';
 import ProductSelectPage from './components/pages/ProductSelectPage';
 import EquityHomePage from './components/pages/EquityHomePage';
 import CompaniesPage from './components/pages/CompaniesPage';
-// We will create ShareholdersPage and IssuancesPage next
-// import ShareholdersPage from './components/pages/ShareholdersPage';
-// import IssuancesPage from './components/pages/IssuancesPage';
+import ShareholdersPage from './components/pages/ShareholdersPage';
+import IssuancesPage from './components/pages/IssuancesPage';
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -21,32 +20,25 @@ const App = () => {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [companyData, setCompanyData] = useState({ shareholders: [], shareClasses: [], shareIssuances: [] });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('productselect'); // Start at product select
+  const [activeTab, setActiveTab] = useState('productselect');
   const [currentRoute, setCurrentRoute] = useState(window.location.pathname);
 
   // --- AUTHENTICATION & DATA FETCHING ---
   useEffect(() => {
-    // Listen for auth state changes
     const { data: authListener } = AuthService.onAuthStateChange((_user) => {
       setUser(_user);
       if (!_user) {
         setLoading(false);
-        // Reset state on logout
         setCompanies([]);
         setSelectedCompany(null);
         setCompanyData({ shareholders: [], shareClasses: [], shareIssuances: [] });
-        setActiveTab('productselect'); // Go back to product select on logout
+        setActiveTab('productselect');
       }
     });
-
-    // Check for session on initial load
     AuthService.getSession().then(({ data: { session } }) => {
-      if (!session?.user) {
-        setLoading(false);
-      }
+      if (!session?.user) setLoading(false);
       setUser(session?.user ?? null);
     });
-
     return () => authListener?.subscription.unsubscribe();
   }, []);
 
@@ -61,14 +53,15 @@ const App = () => {
         setCompanies(userCompanies);
         if (userCompanies.length > 0 && !selectedCompany) {
           setSelectedCompany(userCompanies[0]);
+        } else if (userCompanies.length === 0) {
+            setLoading(false);
         }
       }).catch(error => {
         console.error("Failed to fetch initial user data:", error);
-      }).finally(() => {
         setLoading(false);
       });
     }
-  }, [user, selectedCompany]);
+  }, [user]);
 
   useEffect(() => {
     if (selectedCompany) {
@@ -91,13 +84,11 @@ const App = () => {
     if (activeTab === 'productselect') {
         return <ProductSelectPage onProductSelect={setActiveTab} />;
     }
-    // Placeholder for when a user has no companies
-    if (!selectedCompany && activeTab !== 'productselect') {
+    if (!selectedCompany) {
         return (
             <div className="text-center p-10 bg-white rounded-lg shadow">
                 <h2 className="text-2xl font-bold mb-4">Welcome!</h2>
                 <p>Create a company to get started with Equity Management.</p>
-                {/* We'll add a "Create Company" button here later */}
             </div>
         );
     }
@@ -105,9 +96,10 @@ const App = () => {
     switch (activeTab) {
       case 'companies':
         return <CompaniesPage companies={companies} />;
-      // Add cases for 'shareholders', 'issuances', etc. here
-      // case 'shareholders':
-      //   return <ShareholdersPage shareholders={companyData.shareholders} />;
+      case 'shareholders':
+        return <ShareholdersPage companyData={companyData} />;
+      case 'issuances':
+        return <IssuancesPage companyData={companyData} />;
       case 'equityhome':
       default:
         return <EquityHomePage companyData={companyData} shareClasses={companyData.shareClasses} />;
@@ -118,17 +110,14 @@ const App = () => {
     return <div className="flex justify-center items-center h-screen font-bold text-xl">Loading...</div>;
   }
 
-  // Admin routing
   if (currentRoute.startsWith('/adminhq')) {
     return currentRoute === '/adminhq/login' ? <AdminLogin /> : <AdminApp />;
   }
 
-  // Main application logic
   if (!user) {
     return <AuthPage />;
   }
   
-  // Render main app layout or product select page
   return (
     <div className="flex min-h-screen bg-gray-50">
       {activeTab !== 'productselect' && <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
