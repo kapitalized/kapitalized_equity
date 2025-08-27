@@ -45,6 +45,17 @@ export const signOutUser = () => {
 };
 
 /**
+ * Sends a password reset email to the user.
+ * @param {string} email - The email address to send the reset link to.
+ * @returns {Promise<{ data: any, error: any }>} The result of the operation.
+ */
+export const sendPasswordResetEmail = (email) => {
+    return supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin, // Redirects user back to your app after reset
+    });
+};
+
+/**
  * Subscribes to authentication state changes.
  * @param {function} callback - The function to call when the auth state changes.
  * @returns {object} The subscription object, which can be used to unsubscribe.
