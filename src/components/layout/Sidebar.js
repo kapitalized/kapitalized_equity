@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Building2, Users, PlusCircle } from 'lucide-react'; // Example icons
+import { BarChart3, Building2, Users, PlusCircle, Download, Mail } from 'lucide-react'; // Added icons
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
     const navItems = [
@@ -7,6 +7,8 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
         { id: 'companies', name: 'Companies', icon: Building2 },
         { id: 'shareholders', name: 'Shareholders', icon: Users },
         { id: 'issuances', name: 'Issuances', icon: PlusCircle },
+        { id: 'reports', name: 'Reports', icon: Download },
+        { id: 'notifications', name: 'Notifications', icon: Mail },
     ];
 
     return (
