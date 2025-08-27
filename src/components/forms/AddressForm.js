@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { countryData } from '../../styles';
 
 const AddressForm = ({ initialAddress, onAddressChange }) => {
-  const [address, setAddress] = useState(initialAddress || { line1: '', line2: '', country: '', state: '', postcode: '' });
+  const [address, setAddress] = useState(initialAddress || { line1: '', line2: '', suburb: '', country: '', state: '', postcode: '' });
   const [states, setStates] = useState([]);
 
   useEffect(() => {
@@ -31,6 +31,10 @@ const AddressForm = ({ initialAddress, onAddressChange }) => {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Line 2 (optional)</label>
         <input type="text" value={address.line2} onChange={(e) => handleChange('line2', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Suburb or City</label>
+        <input type="text" value={address.suburb} onChange={(e) => handleChange('suburb', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md" required />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
