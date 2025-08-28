@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 import SortableTable from '../../../components/ui/SortableTable';
-import Modal from '../ui/Modal';
+import Modal from '../../../ui/Modal';
 import ShareholderForm from '../forms/ShareholderForm';
 import * as ApiService from '../../services/apiService';
 

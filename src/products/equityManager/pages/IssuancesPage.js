@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 import SortableTable from '../../../components/ui/SortableTable';
-import Modal from '../ui/Modal';
+import Modal from '../../../ui/Modal';
 // Placeholder for IssuanceForm
 const IssuanceForm = ({ onSubmit, onCancel }) => (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit({ shares: 1000, pricePerShare: 1.5, issueDate: '2025-08-27' }); }}>
