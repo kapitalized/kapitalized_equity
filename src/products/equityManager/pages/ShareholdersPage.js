@@ -3,7 +3,7 @@ import { PlusCircle } from 'lucide-react';
 import SortableTable from '../../../components/ui/SortableTable';
 import Modal from '../../../components/ui/Modal';
 import ShareholderForm from '../forms/ShareholderForm';
-import * as ApiService from '../../services/apiService';
+import * as ApiService from '../../../services/apiService';
 
 const ShareholdersPage = ({ companyData, selectedCompany, onDataRefresh }) => {
     const [showCreateModal, setShowCreateModal] = useState(false);

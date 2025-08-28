@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import * as ApiService from '../../services/apiService';
-import * as AuthService from '../../services/authService';
+import * as ApiService from '../../../services/apiService';
+import * as AuthService from '../../../services/authService';
 
 const AccountPage = ({ user, userProfile, onProfileUpdate }) => {
     const [profileData, setProfileData] = useState({
