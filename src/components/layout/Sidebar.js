@@ -1,7 +1,7 @@
 import React from 'react';
-import { BarChart3, Building2, Users, PlusCircle, Download, Mail } from 'lucide-react';
+import { BarChart3, Building2, Users, PlusCircle, Download, Mail, ArrowLeft } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab }) => {
+const Sidebar = ({ activeTab, setActiveTab, onBackToProducts }) => {
     const navItems = [
         { id: 'equityhome', name: 'Equity Home', icon: BarChart3 },
         { id: 'companies', name: 'Companies', icon: Building2 },
@@ -16,7 +16,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
             <div className="p-4 border-b">
                 <img src="https://kapitalized.com/wp-content/uploads/KAP-Logo-150px.webp" alt="Kapitalized Logo" className="h-10" />
             </div>
-            <nav className="p-4">
+            <nav className="p-4 flex-1">
                 <ul>
                     {navItems.map(item => (
                         <li key={item.id}>
@@ -35,6 +35,15 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
                     ))}
                 </ul>
             </nav>
+            <div className="p-4 border-t">
+                <button
+                    onClick={onBackToProducts}
+                    className="w-full flex items-center text-left p-2 rounded-md my-1 text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                    <ArrowLeft className="h-5 w-5 mr-3" />
+                    Back to Products
+                </button>
+            </div>
         </div>
     );
 };
