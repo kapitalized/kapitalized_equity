@@ -23,6 +23,7 @@ import ReportsPage from './products/equityManager/pages/ReportsPage';
 import NotificationsPage from './products/equityManager/pages/NotificationsPage';
 import AccountPage from './products/equityManager/pages/AccountPage';
 import CapitalRaisingPage from './products/capitalRaising/pages/CapitalRaisingPage';
+import DataroomPage from './products/dataroom/pages/DataroomPage';
 
 
 // ===================================================================================
@@ -187,8 +188,8 @@ const App = () => {
                 return <EquityManager user={user} userProfile={userProfile} onProfileUpdate={() => ApiService.fetchUserProfile(user.id).then(setUserProfile)} onBackToProducts={() => setActiveProduct(null)} />;
             case 'capitalRaising':
                  return <CapitalRaisingPage />;
-            // case 'dataroom':
-            //     return <DataroomPage />;
+            case 'dataroom':
+                 return <DataroomPage />;
             default:
                 return <ProductSelectPage onProductSelect={setActiveProduct} />;
         }
