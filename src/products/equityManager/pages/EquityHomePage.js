@@ -1,12 +1,12 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { PIE_CHART_COLORS } from '../../../styles';
-import SortableTable from '../ui/SortableTable'; // We will use our new component
+import { PIE_CHART_COLORS } from '../../../styles'; // Corrected 3 levels up
+import SortableTable from '../../../components/ui/SortableTable'; 
 
 const EquityHomePage = ({ companyData, shareClasses }) => {
     // Helper function to process data for display
     const getSummaryData = (issuances) => {
-        if (!issuances || issuances.length === 0) {
+        if (!issuances || !shareClasses || issuances.length === 0) {
             return { totalShares: 0, totalValue: 0, classSummary: [], latestValuationPerShare: 0, companyValuation: 0 };
         }
 
@@ -78,7 +78,7 @@ const EquityHomePage = ({ companyData, shareClasses }) => {
                                 outerRadius={100}
                                 dataKey="totalShares"
                                 nameKey="name"
-                                label={({name, percentage}) => `${name}: ${percentage}%`}
+                                label={({name, percentage})=> `${name}: ${percentage}%`}
                             >
                                 {summary.classSummary.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={PIE_CHART_COLORS[index % PIE_CHART_COLORS.length]} />
