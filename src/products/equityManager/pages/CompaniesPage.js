@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
-import SortableTable from '../ui/SortableTable';
+import SortableTable from '../../../components/ui/SortableTable';
 import Modal from '../ui/Modal';
 import CompanyForm from '../forms/CompanyForm';
 import * as ApiService from '../../services/apiService';
