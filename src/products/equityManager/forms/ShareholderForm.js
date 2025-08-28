@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SHAREHOLDER_TYPES } from '../../styles';
+import { SHAREHOLDER_TYPES } from '../../../styles';
 
 const ShareholderForm = ({ onSubmit, onCancel, initialData = {} }) => {
   const [data, setData] = useState({
