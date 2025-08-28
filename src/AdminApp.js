@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Building2, PlusCircle, Users, LogOut, Loader2, Search, Edit, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import { theme } from '../../../styles';
+import { theme } from '/styles';
 import _ from 'lodash';
 // Import the Supabase client from your new service file
 import { supabaseClient } from './services/authService';
