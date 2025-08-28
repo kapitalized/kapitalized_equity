@@ -232,3 +232,32 @@ export const deleteIssuance = async (issuanceId) => {
         .eq('id', issuanceId);
     if (error) throw error;
 };
+
+// Add this function for Capital Raising Notes product module
+
+/**
+ * Creates a new capital raising note.
+ * @param {string} offeringType - The type of offering (e.g., 'common', 'safe').
+ * @param {object} financials - The financial details for the note.
+ * @param {string} companyId - The ID of the associated company.
+ * @param {string} userId - The ID of the user creating the note.
+ * @returns {Promise<object>} The newly created note data.
+ */
+export const createCapitalRaiseNote = async (offeringType, financials, companyId, userId) => {
+    const { data, error } = await supabaseClient
+        .from('capital_raising_notes')
+        .insert({
+            company_id: companyId,
+            user_id: userId,
+            offering_type: offeringType,
+            details: financials, // The financials object is stored in the JSONB column
+        })
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error creating capital raise note:', error);
+        throw error;
+    }
+    return data;
+};
