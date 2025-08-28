@@ -1,6 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { PIE_CHART_COLORS } from '../../styles'; // Corrected 3 levels up
+import { PIE_CHART_COLORS } from '../../../styles'; // Corrected 3 levels up
 import SortableTable from '../../../components/ui/SortableTable'; 
 
 const EquityHomePage = ({ companyData, shareClasses }) => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart3, Download, Upload } from 'lucide-react';
-import { theme } from '../../../styles';
+import { theme } from '../../styles';
 
 const ProductSelectPage = ({ onProductSelect }) => {
     return (
